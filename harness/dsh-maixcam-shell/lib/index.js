@@ -30,6 +30,7 @@ import {
 	toEvidence,
 	topK,
 } from './corpus.js'
+import { createCorpusTools, unavailable } from './tools.js'
 
 /** 需要连接服务来注册 `/api` 路由。 */
 export const inject = ['connection']
@@ -51,6 +52,10 @@ const DEFAULTS = {
 	topK: 5,
 	/** 单次嵌入调用的超时。 */
 	embedTimeoutMs: 20000,
+	/** 是否把检索能力注册成 agent 工具。 */
+	enableTools: true,
+	/** agent 工具的单次调用超时。 */
+	toolTimeoutMs: 60000,
 }
 
 /** 不缓存：这些响应随语料与查询变化，缓存只会让人对不上号。 */
@@ -149,6 +154,37 @@ export function apply(ctx, config) {
 		)
 	}
 
+	/**
+	 * 跑一次检索。路由和 agent 工具共用这一条路径 —— 只有一份实现，
+	 * 界面看到的和模型看到的就一定是同一件事。
+	 *
+	 * @param query - 查询词。
+	 * @param k - 取几条。
+	 * @returns 与 `/search` 相同形状的结果（失败时抛错）。
+	 */
+	async function search(query, k) {
+		const c = await ensureCorpus()
+		const started = Date.now()
+		const vector = await embed(
+			{
+				baseUrl: settings.embedBaseUrl,
+				model: settings.embedModel,
+				apiKey: settings.embedApiKey,
+				timeoutMs: settings.embedTimeoutMs,
+			},
+			query,
+		)
+		const embedMs = Date.now() - started
+		return {
+			query,
+			k,
+			strategy: 'dense',
+			embedMs,
+			totalMs: Date.now() - started,
+			hits: topK(c, vector, k).map((hit) => toEvidence(c, hit)),
+		}
+	}
+
 	// ── 状态：界面靠它回答「你现在到底知道什么」 ─────────────────────────────
 	route(`${PREFIX}/status`, ['GET'], 'buffered', async () => {
 		const base = {
@@ -172,35 +208,8 @@ export function apply(ctx, config) {
 		const k = Math.min(Math.max(Number(url.searchParams.get('k')) || settings.topK, 1), 20)
 		if (query === '') return json({ ok: false, error: '缺少查询词 q' }, 400)
 
-		let c
 		try {
-			c = await ensureCorpus()
-		} catch (error) {
-			return json({ ok: false, error: reason(error) }, 503)
-		}
-
-		const started = Date.now()
-		try {
-			const vector = await embed(
-				{
-					baseUrl: settings.embedBaseUrl,
-					model: settings.embedModel,
-					apiKey: settings.embedApiKey,
-					timeoutMs: settings.embedTimeoutMs,
-				},
-				query,
-			)
-			const embedMs = Date.now() - started
-			const hits = topK(c, vector, k).map((hit) => toEvidence(c, hit))
-			return json({
-				ok: true,
-				query,
-				k,
-				strategy: 'dense',
-				embedMs,
-				totalMs: Date.now() - started,
-				hits,
-			})
+			return json({ ok: true, ...(await search(query, k)) })
 		} catch (error) {
 			// 检索失败要说清楚是嵌入服务的问题，而不是「没找到」。
 			return json({ ok: false, error: reason(error), stage: 'embed' }, 503)
@@ -219,6 +228,46 @@ export function apply(ctx, config) {
 		}
 		const result = lookupSymbol(c, name)
 		return json({ ok: true, name, ...result })
+	})
+
+	// ── agent 工具：让助手真的去查，而不是凭记忆写 ──────────────────────────
+	//
+	// 这两个工具注册在**宿主平面**，因此对每一个会话都可见。对一个专用应用
+	// （这个进程就是「MaixCAM 开发助手」）这正是想要的；若以后要与别的领域共用
+	// 同一个进程，它们就该搬到 agent preset 里，并把检索服务放进 isolate realm ——
+	// 那是 docs/design/06 §3.4 讲的平面归属问题。
+	//
+	// `tools` 服务是可选的：没有它时只少两个工具，路由照样工作。
+	ctx.inject(['tools'], (toolsCtx) => {
+		if (settings.enableTools !== true) {
+			ctx.logger?.info?.('dsh-maixcam-shell: 检索工具已按配置关闭')
+			return
+		}
+		const tools = createCorpusTools({
+			search: async (query, k) => {
+				try {
+					return await search(query, k)
+				} catch (error) {
+					// 工具失败要说清原因，别让模型把「查不了」当成「没有」。
+					throw new CorpusError(unavailable(error))
+				}
+			},
+			lookup: async (name) => {
+				try {
+					return { name, ...lookupSymbol(await ensureCorpus(), name) }
+				} catch (error) {
+					throw new CorpusError(unavailable(error))
+				}
+			},
+			getTimeoutMs: () => settings.toolTimeoutMs,
+		})
+		for (const tool of tools) {
+			const label = `dsh-maixcam-shell: tool ${tool.name ?? '?'}`
+			ctx.effect(() => toolsCtx.tools.register(tool), label)
+		}
+		ctx.logger?.info?.(
+			`dsh-maixcam-shell: 检索工具已注册（${tools.map((t) => t.name).join(' / ')}）`,
+		)
 	})
 
 	ctx.logger?.info?.(`dsh-maixcam-shell: 检索路由就绪（${PREFIX}）`)
