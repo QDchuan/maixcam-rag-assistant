@@ -88,6 +88,39 @@ if not exist "%EXE%" (
 "%EXE%" %*
 """
 
+# Git Bash / WSL 那边**不认 `.cmd`**——它们按 POSIX 的规矩找可执行文件，
+# 而 `.cmd` 在 Bash 里只是一个普通文件（不会自动带扩展名去试）。
+# 所以同一个目录里再放一个**无扩展名的 sh 脚本**。
+#
+# 这不是"多此一举"：用户说"不行"的时候，我不知道他用的是哪个终端。
+# 与其猜，不如让两种壳都认。
+SHIM_SH = """#!/bin/sh
+# {name} —— MaixCAM 开发助手的终端演示
+#
+# **这个文件是生成的，别手改。** 它由下面这条命令写出来：
+#     {installer}
+# 仓库挪了位置就重跑那条命令。
+#
+# 为什么除了 .cmd 还要有这一个：Git Bash / WSL **不认 .cmd**——
+# 它们按 POSIX 的规矩找可执行文件，不会自动加扩展名去试。
+
+REPO="{repo}"
+EXE="$REPO/.venv/Scripts/{name}.exe"
+
+if [ ! -x "$EXE" ]; then
+  echo "[{name}] 找不到 $EXE" >&2
+  echo "" >&2
+  echo "这个脚本记的是生成时的路径：$REPO" >&2
+  echo "仓库如果挪了位置，先装一次入口点、再重跑安装脚本：" >&2
+  echo "  cd <仓库新位置>" >&2
+  echo "  .venv/Scripts/pip.exe install -e . --no-deps" >&2
+  echo "  .venv/Scripts/python.exe scripts/install_command.py" >&2
+  exit 2
+fi
+
+exec "$EXE" "$@"
+"""
+
 
 def on_path(directory: Path) -> bool:
     parts = [p.strip().rstrip("\\").lower()
@@ -140,14 +173,21 @@ def install() -> int:
         return 2
 
     shim = d / f"{NAME}.cmd"
-    shim.write_text(
-        SHIM.format(name=NAME, repo=ROOT,
-                    installer=f"{ROOT}\\.venv\\Scripts\\python.exe "
-                              f"scripts\\install_command.py"),
-        encoding="utf-8",
-    )
-    print(f"✓ 已写入 {shim}")
-    print(f"  它调用：{exe}")
+    installer = (f"{ROOT}\\.venv\\Scripts\\python.exe scripts\\install_command.py")
+    shim.write_text(SHIM.format(name=NAME, repo=ROOT, installer=installer),
+                    encoding="utf-8")
+    print(f"✓ 已写入 {shim}（cmd / PowerShell）")
+
+    # 同一个目录再放一个无扩展名的 sh 脚本给 Git Bash / WSL。
+    sh = d / NAME
+    sh.write_text(SHIM_SH.format(name=NAME, repo=ROOT, installer=installer),
+                  encoding="utf-8", newline="\n")
+    try:
+        sh.chmod(0o755)
+    except Exception:
+        pass
+    print(f"✓ 已写入 {sh}（Git Bash / WSL）")
+    print(f"  两者都调用：{exe}")
 
     # 当前这个进程的 PATH 里已经有那个目录了，直接试跑
     if shutil.which(NAME) is None:
