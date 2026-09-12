@@ -158,6 +158,20 @@ export function apply(ctx, config) {
 	}
 
 	/**
+	 * 判断这是不是一道**设计类**问题（要搭一个系统，而不是问一个事实）。
+	 *
+	 * 判据刻意保守：同时出现「造东西」的动词和「一个东西」的名词才算。
+	 * 「PWM 怎么用」不是设计题，「设计一个人脸跟随系统」是。
+	 *
+	 * @param query - 查询词。
+	 * @returns 是否像设计类问题。
+	 */
+	function looksLikeDesignTask(query) {
+		const q = String(query ?? '')
+		return /设计|实现|做一个|做个|搭建|搭一个|开发|规划|方案/.test(q)
+			&& /系统|方案|项目|装置|平台|机器人|云台|跟随|闭环/.test(q)
+	}
+	/**
 	 * 跑一次**混合检索**：稠密 + 稀疏，RRF 融合。
 	 *
 	 * @param c - 语料句柄。
@@ -236,6 +250,8 @@ export function apply(ctx, config) {
 				strategy: 'hybrid(rrf: dense+bm25)',
 				embedMs,
 				totalMs: Date.now() - started,
+				// 设计类问题却只查了一次 —— 交给渲染层把「你先拆子系统」这道门竖起来。
+				needsAspects: looksLikeDesignTask(query),
 				coverage: moduleCoverage(c, hits),
 				hits,
 			}
