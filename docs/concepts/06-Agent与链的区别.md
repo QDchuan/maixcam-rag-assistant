@@ -6,7 +6,7 @@
 >
 > 相关：[tutorial 00 主线导览](../tutorial/00-主线导览.md) ·
 > [事故 06 预算与任务不匹配](../postmortem/06-预算与任务不匹配.md) ·
-> 习题：[`exercises/concepts/06-Agent与链的区别.md`](../exercises/concepts/06-Agent与链的区别.md)（待写）
+> 习题：[`exercises/concepts/06-Agent与链的区别.md`](../exercises/concepts/06-Agent与链的区别.md)
 
 ---
 
@@ -227,7 +227,7 @@
 ## 7. 这一章留下的问题
 
 读到这里，你应该能回答下面这些问题。**答不出来说明前面没读透。**
-答案在 [`exercises/answers/06-Agent与链的区别.md`](../exercises/answers/06-Agent与链的区别.md)（待写）。
+答案在 [`exercises/answers/06-Agent与链的区别.md`](../exercises/answers/06-Agent与链的区别.md)。
 
 1. "链与循环的区别只有一个，但它带来四类新问题"——把这个"一个区别"说清楚，
    并解释为什么四类问题**不能靠"更强的模型"解决**。
@@ -252,11 +252,11 @@
 
 ## 相关
 
-- 上一章：[05 生成与忠实性](./05-生成与忠实性.md)（待写）
-- 下一章：[07 评测：两条轴](./07-评测-两条轴.md)（待写）
+- 上一章：[05 生成与忠实性](./05-生成与忠实性.md)
+- 下一章：[07 评测：两条轴](./07-评测-两条轴.md)
 - 事故：[06 预算与任务不匹配](../postmortem/06-预算与任务不匹配.md)、
   [05 伪装成好消息的 0](../postmortem/05-伪装成好消息的0.md)
-- 习题：[`exercises/concepts/06-Agent与链的区别.md`](../exercises/concepts/06-Agent与链的区别.md)（待写）
+- 习题：[`exercises/concepts/06-Agent与链的区别.md`](../exercises/concepts/06-Agent与链的区别.md)
 - 教学主线：[tutorial 00 主线导览](../tutorial/00-主线导览.md)
 - 设计取舍：[01 系统架构设计 · 4.6 L6 Agent 层](../design/01-系统架构设计.md)、
   [03 评测与质量提升路线 · 9. Agent 版怎么评](../design/03-评测与质量提升路线.md)

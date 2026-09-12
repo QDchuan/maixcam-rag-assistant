@@ -36,18 +36,28 @@
 
 ---
 
-## 文档的五层
+## 文档的六层
 
 | 层 | 回答什么 | 面向 | 什么时候看 |
 | --- | --- | --- | --- |
-| [**postmortem**](./postmortem/README.md) | "我遇到这个现象，是怎么回事" | 排障 | **遇到问题时** |
-| [**tutorial**](./tutorial/00-主线导览.md) | "我该怎么做，为什么" | 学习 | 系统学一遍时 |
-| [**reference**](./reference/) | "这个参数是什么" | 使用 | 边做边查 |
+| [**postmortem**](./postmortem/README.md) | "我遇到这个现象，是怎么回事" | 排障 | **遇到问题时**（按症状查） |
+| [**concepts**](./concepts/) | "这东西是什么，为什么长这样" | 建立认知 | 想搞懂原理时（可跳读、可查阅） |
+| [**tutorial**](./tutorial/00-主线导览.md) | "我该怎么做，为什么" | 学习 | 系统学一遍时（按顺序走） |
+| [**exercises**](./exercises/README.md) | "我到底懂没懂" | 自检 | 读完一章之后 |
+| **reference** | "这个参数是什么" | 使用 | 边做边查（待建） |
 | [**design**](./design/) | "当初为什么这么定" | 评审 | 想审设计时 |
 | **evidence** | "这个数字怎么来的" | 怀疑 | 想验证时（待建） |
 
-**层与层之间不重复**：tutorial 里不出现完整参数表（那属于 reference），
-reference 里不解释动机（那属于 design）。
+**层与层之间不重复**，各有各的边界：
+
+- **concepts vs tutorial**：概念文档让你知道**自己在做什么**；tutorial 让你**做得出来**。
+  两层双向链接，概念可以跳读查阅，tutorial 需要按顺序走。
+- **exercises 不引入新知识**：它只检验前面几层教过的东西。
+  这也是为什么它的题目来自概念文档第 7 节的「这一章留下的问题」——
+  **问题由概念文档提出，习题负责检验你能不能回答。**
+- **tutorial 里不出现完整参数表**（那属于 reference）；
+  **reference 里不解释动机**（那属于 design）；
+  **design 里不写操作步骤**（那属于 tutorial）。
 
 ---
 
@@ -132,7 +142,7 @@ python scripts/demo_sandbox.py    # 安全错：权限越界，"拦住了≠拦�
 
 每一章都有习题，分四组：**复现 / 诊断 / 改造 / 判断**。
 
-参考答案在 [`docs/exercises/answers.md`](./exercises/)（待写）。
+参考答案在 [`docs/exercises/answers.md`](./exercises/)。
 
 **C 组（改造）是核心**：它逼你先写下预测，再验证。
 "预测错了"恰恰是最有价值的学习时刻——而绝大多数教学文档不给你犯错的机会。

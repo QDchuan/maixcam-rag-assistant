@@ -3,9 +3,9 @@
 > **这一章要建立的认知**：RAG 不是"让模型更聪明"，而是**在回答的那一刻，把权威文档
 > 送到模型眼前**。它解决的不是能力问题，是**知识的存放位置问题**。
 >
-> 相关：[tutorial 00 主线导览](../tutorial/00-主线导览.md)（待写）·
+> 相关：[tutorial 00 主线导览](../tutorial/00-主线导览.md)·
 > [事故 02 有文档却召不回](../postmortem/02-有文档却召不回.md) ·
-> 习题：[`exercises/concepts/00-为什么需要RAG.md`](../exercises/concepts/00-为什么需要RAG.md)（待写）
+> 习题：[`exercises/concepts/00-为什么需要RAG.md`](../exercises/concepts/00-为什么需要RAG.md)
 
 ---
 
@@ -94,7 +94,7 @@ MaixCam 上的 MaixPy v4 是重写过的（[`corpus/raw/repo/faq.md`](../../corp
 
 人工版本的问题不在于方向错了，而在于它**不稳定、不可复现、不可测量**：
 出了问题说不清是"没找对页"还是"模型没用好"。本项目要做的，就是把这条链路自动化，
-并**把每一步的质量变成可测量的**（见 [07 评测 · 两条轴](./07-评测-两条轴.md)（待写））。
+并**把每一步的质量变成可测量的**（见 [07 评测 · 两条轴](./07-评测-两条轴.md)）。
 
 ## 4. 本项目的实测证据
 
@@ -192,7 +192,7 @@ L1 链式基线在 YOLO 那道题上明确说"资料中没有给出完整代码�
 ## 7. 这一章留下的问题
 
 读到这里，你应该能回答下面这些问题。**答不出来说明前面没读透。**
-参考答案：[`exercises/answers/00-为什么需要RAG.md`](../exercises/answers/00-为什么需要RAG.md)（待写）。
+参考答案：[`exercises/answers/00-为什么需要RAG.md`](../exercises/answers/00-为什么需要RAG.md)。
 
 1. **（概念）** 为什么"模型编造 MaixPy API"这件事，**提高模型能力不是它的解法**？
    请用"知识在哪儿"这个视角回答，而不要用"模型够不够聪明"。
@@ -219,11 +219,11 @@ L1 链式基线在 YOLO 那道题上明确说"资料中没有给出完整代码�
 ## 相关
 
 - 上一章：无（本章是 `concepts/` 的第一篇）
-- 下一章：[01 RAG 的完整链路](./01-RAG的完整链路.md)（待写）
+- 下一章：[01 RAG 的完整链路](./01-RAG的完整链路.md)
 - 事故：[02 有文档却召不回](../postmortem/02-有文档却召不回.md) ·
   [05 伪装成好消息的 0](../postmortem/05-伪装成好消息的0.md) ·
   [01 静默的空结果](../postmortem/01-静默的空结果.md)
-- 习题：[`exercises/concepts/00-为什么需要RAG.md`](../exercises/concepts/00-为什么需要RAG.md)（待写）
+- 习题：[`exercises/concepts/00-为什么需要RAG.md`](../exercises/concepts/00-为什么需要RAG.md)
 - 设计取舍：[00 项目定位与教学大纲 · 2.1 / 5.4 / 6.1](../design/00-项目定位与教学大纲.md) ·
   [01 系统架构设计 · 4.5.3 防幻觉校验](../design/01-系统架构设计.md)
 - 评测集：[`eval/datasets/seed.jsonl`](../../eval/datasets/seed.jsonl)

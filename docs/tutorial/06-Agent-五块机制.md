@@ -316,15 +316,15 @@ python -m maixrag --config configs/l2_hybrid.yaml ask "MaixPy 里怎么做 YOLO 
   且你能说清"没有审批人时拒绝"为什么必须是这样——换成"没人问就放行"会作废哪一层
 - 依据：[concepts 08 权限与沙盒](../concepts/08-权限与沙盒.md)、`maixrag/agent/sandbox.py`
 
-> 问答题见 `../exercises/concepts/06-Agent与链的区别.md`（该文件**待写**，
-> 概念文档 [`concepts/06`](../concepts/06-Agent与链的区别.md) 第 7 节里的四问就是它的题目）。
+> 问答题见 [`../exercises/concepts/06-Agent与链的区别.md`](../exercises/concepts/06-Agent与链的区别.md)
+> —— 概念文档 [`concepts/06`](../concepts/06-Agent与链的区别.md) 第 7 节里的四问就是它的题目。
 
 ---
 
 ## 相关
 
-- 上一章：[05 提示词装配](./05-评测.md)（待写）
-- 下一章：[07 端到端评测](./07-端到端.md)（待写）
+- 上一章：[05 提示词装配](./05-评测.md)
+- 下一章：[07 端到端评测](./07-端到端.md)
 - 概念：[06 Agent 与链的区别](../concepts/06-Agent与链的区别.md) ·
   [08 权限与沙盒](../concepts/08-权限与沙盒.md)
 - 事故：[06 预算与任务不匹配](../postmortem/06-预算与任务不匹配.md) ·
