@@ -305,10 +305,23 @@ def test_banner_stats_come_from_the_real_assembly():
 
     一条写死的 "3838 chunk" 在语料变了之后就变成假话，
     而演示程序里出现假话比没有演示更糟。
+
+    **这条规矩抓到过真事**：横幅原来硬编码写"检索 BM25 + 向量 + RRF"，
+    而当时的默认配置是 `retrievers: ["dense"]`——只跑稠密检索。
+    启动画面在描述一套没有启用的配置。所以这里连检索器那一行也要断言。
     """
+
+    class _Member:
+        def __init__(self, name):
+            self.name = name
+
+    class _Retriever:
+        members = [_Member("dense"), _Member("bm25")]
+        fusion = "rrf"
 
     class _Rag:
         chunks = [1, 2, 3]
+        retriever = _Retriever()
 
     class _Tools:
         def schemas(self):
@@ -317,9 +330,43 @@ def test_banner_stats_come_from_the_real_assembly():
         def names(self):
             return ["a", "b"]
 
+    class _Loop:
+        class _Limits:
+            max_turns = 12
+
+        _budget_limits = _Limits()
+
+    class _App:
+        rag = _Rag()
+        tools = _Tools()
+        loop = _Loop()
+
+    stats = build_banner_stats(_App())
+    assert stats["chunks"] == 3
+    assert stats["tools"] == 2
+    assert stats["caps"] == 2
+    # 检索那一行必须来自真实检索器，不能是写死的字符串
+    assert stats["retrieval"] == "向量 + BM25 + RRF"
+    assert stats["budget"] == 12
+
+
+def test_banner_stats_handles_disabled_retrieval():
+    """retrieval.mode=none 时不能崩，也不能吹牛说自己有检索。"""
+
+    class _Rag:
+        chunks = []
+        retriever = None
+
+    class _Tools:
+        def schemas(self):
+            return []
+
+        def names(self):
+            return []
+
     class _App:
         rag = _Rag()
         tools = _Tools()
 
     stats = build_banner_stats(_App())
-    assert stats == {"chunks": 3, "tools": 2, "caps": 2}
+    assert stats["retrieval"] == "未启用检索"

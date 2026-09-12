@@ -265,15 +265,13 @@ def _build_main_branch_agent(cfg, args, bundle=None):
 
     policy = SandboxPolicy.workspace_only(Path.cwd())
 
-    # 预算：命令行优先，其次配置，最后给一个保守默认。
+    # 预算：命令行优先，其次配置。**默认值只有一个出处（配置）。**
     #
     # **实测发现 4 轮对这个语料的多跳问题不够**：agent 会先检索、再改写查询、
     # 再切到确定性工具、再带着新学到的类名回去检索——四步都很合理，
     # 但第四步就撞墙了。所以预算要匹配**任务深度**，不是越小越好。
-    max_turns = getattr(args, "max_turns", 0) or (
-        cfg.agent.max_turns if cfg.agent.enabled else 4
-    )
-    max_tools = getattr(args, "max_tool_calls", 0) or max(6, max_turns + 2)
+    max_turns = getattr(args, "max_turns", 0) or cfg.agent.max_turns
+    max_tools = getattr(args, "max_tool_calls", 0) or max(6, max_turns * 2)
     budget = Budget(max_turns=max_turns, max_tool_calls=max_tools)
     return build_agent(
         cfg, chunks=bundle.chunks, symbols=bundle.symbols, roster=bundle.roster,
@@ -436,7 +434,26 @@ def cmd_demo(args: argparse.Namespace) -> int:
         print(f"{C_DIM}  正在装配 agent（加载语料与索引）…{RESET}",
               end="", flush=True)
     cfg = Config.load(args.config, project_root=Path.cwd())
-    app = _build_main_branch_agent(cfg, args)
+    try:
+        app = _build_main_branch_agent(cfg, args)
+    except RuntimeError as e:
+        # 最常见的"跑不起来"：密钥没配。**不要只抛一个栈。**
+        # 交互终端上直接引导进配置向导——第一次用的人不该自己去猜 .env 在哪。
+        if "API Key" not in str(e) or not _is_tty(sys.stdin):
+            raise
+        if live:
+            print("\r" + " " * 56 + "\r", end="", flush=True)
+        print(f"{C_DIM}  还没配置模型端点，先跑一次配置向导。{RESET}")
+        print(f"{C_DIM}  （不想走向导也可以直接编辑 {Path.cwd() / '.env'}，"
+              f"见 docs/tutorial/09-配置与密钥.md）{RESET}")
+        from .setup import run_wizard
+
+        if not run_wizard(Path.cwd(), preset_key=getattr(args, "preset", "")).ok:
+            return 2
+        print(f"\n{C_DIM}  重新装配…{RESET}")
+        # 重新读配置：向导刚把值写进 .env，而配置对象是向导之前构造的
+        cfg = Config.load(args.config, project_root=Path.cwd())
+        app = _build_main_branch_agent(cfg, args)
     if live:
         print("\r" + " " * 56 + "\r", end="", flush=True)
 
@@ -517,6 +534,68 @@ DEMO_QUESTIONS = [
 ]
 
 
+def cmd_setup(args: argparse.Namespace) -> int:
+    """配置向导 / 配置体检。
+
+    两条路都通向同一个 `.env`：
+      · `maixrag setup`          交互向导——第一次配置用，边走边验证；
+      · `maixrag setup --check`  只报告当前生效的配置——出问题时用。
+
+    **配置类问题里有一半是"我以为它是 A，其实它是 B"。**
+    所以"看清现在是什么"和"把它改对"同样重要，各给一条命令。
+    """
+    from .setup import PRESETS, apply_values, report, run_wizard
+
+    root = Path.cwd()
+    _print_header("配置")
+
+    if args.list_presets:
+        print("可选的组合：\n")
+        for i, p in enumerate(PRESETS, 1):
+            print(f"  {i}) {p.key:<8} {p.label}")
+            print(f"     {p.summary}")
+            if p.caveat:
+                print(f"     ⚠ {p.caveat}")
+            print()
+        return 0
+
+    if args.check:
+        text, usable = report(root, probe=args.probe, config_path=args.config)
+        print(text)
+        print()
+        if usable:
+            print("配置可用。")
+            return 0
+        print("配置**不完整或不通**。修法二选一：")
+        print("  · python -m maixrag setup          （交互向导）")
+        print(f"  · 直接编辑 {root / '.env'}（字段含义见 docs/tutorial/09-配置与密钥.md）")
+        return 1
+
+    # 命令行直接给值 = 非交互。这是"不一定非要通过终端回答问题"的那条路。
+    values = {
+        "CHAT_BASE_URL": args.chat_base_url,
+        "CHAT_MODEL": args.chat_model,
+        "CHAT_API_KEY": args.chat_key,
+        "EMBED_BASE_URL": args.embed_base_url,
+        "EMBED_MODEL": args.embed_model,
+        "EMBED_API_KEY": args.embed_key,
+    }
+    if any(v is not None for v in values.values()):
+        print("按命令行给定的值写入（非交互模式）：")
+        res = apply_values(root, values, do_probe=not args.no_probe)
+        return 0 if res.ok else 1
+
+    if not _is_tty(sys.stdin):
+        print("当前不是交互终端。两种做法：")
+        print("  · python -m maixrag setup --check                    看当前配置")
+        print("  · python -m maixrag setup --chat-model X --chat-key Y …  直接给值")
+        print(f"  · 或者直接编辑 {root / '.env'}")
+        return 2
+
+    res = run_wizard(root, preset_key=args.preset)
+    return 0 if res.ok else 2
+
+
 def _avg_tool_calls(report, app) -> str:
     """平均每题的**工具调用数**（不是轮次）。
     **必须读累计计数，不能读 `tools.history`**——单题评测时 history 会被
@@ -547,9 +626,24 @@ def build_parser() -> argparse.ArgumentParser:
         description="MaixCAM 开发助手 —— 一个 RAG 与 Agent 教学项目",
     )
     p.add_argument("--config", default=None, help="配置文件路径（默认用内置默认值）")
+
+    # `--config` 要能**放在子命令前后都行**。
+    #
+    # 原来它只挂在顶层，于是 `maixrag agent-eval --config x.yaml` 报
+    # "unrecognized arguments"——而这是最自然的写法（选项跟在动词后面）。
+    # 跑评测的人第一次就会撞上它，**而这一步跟评测本身毫无关系**。
+    #
+    # 实现上关键是 `default=argparse.SUPPRESS`：子解析器那份 --config 在
+    # **没有显式给出时不写入 args**，因此不会用 None 覆盖掉顶层已经解析到的值。
+    # 直接给子解析器加同样的选项（默认 None）就会踩这个坑——
+    # 顶层的值会被子命令的默认值悄悄抹掉，表现为"配置文件有时生效有时不生效"。
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--config", default=argparse.SUPPRESS,
+                        help=argparse.SUPPRESS)
+
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    c = sub.add_parser("corpus", help="语料相关")
+    c = sub.add_parser("corpus", parents=[common], help="语料相关")
     csub = c.add_subparsers(dest="sub", required=True)
     cf = csub.add_parser("fetch", help="抓取语料（需要网络）")
     cf.add_argument("--ref", default=None, help="分支/tag，默认用配置里的 version")
@@ -560,7 +654,7 @@ def build_parser() -> argparse.ArgumentParser:
     cb = csub.add_parser("build", help="解析 + 切分 + 抽 API 符号")
     cb.set_defaults(func=cmd_corpus_build)
 
-    i = sub.add_parser("index", help="索引相关")
+    i = sub.add_parser("index", parents=[common], help="索引相关")
     isub = i.add_subparsers(dest="sub", required=True)
     ib = isub.add_parser("build", help="建索引")
     ib.add_argument("--fake", action="store_true",
@@ -568,7 +662,7 @@ def build_parser() -> argparse.ArgumentParser:
     ib.add_argument("--rebuild", action="store_true", help="强制重建")
     ib.set_defaults(func=cmd_index_build)
 
-    a = sub.add_parser("ask", help="单次问答")
+    a = sub.add_parser("ask", parents=[common], help="单次问答")
     a.add_argument("question")
     a.add_argument("--level", default="rag",
                    choices=["no_rag", "full_context", "rag"])
@@ -576,7 +670,7 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--show-hits", action="store_true", help="展示召回片段与阶段分数")
     a.set_defaults(func=cmd_ask)
 
-    e = sub.add_parser("eval", help="跑评测")
+    e = sub.add_parser("eval", parents=[common], help="跑评测")
     e.add_argument("--level", default="rag",
                    choices=["no_rag", "full_context", "rag"])
     e.add_argument("--dataset", default=None)
@@ -590,7 +684,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="只把对话换成空客户端——**只想测检索轴时用这个**，不花钱不联网")
     e.set_defaults(func=cmd_eval)
 
-    ab = sub.add_parser("ablate", help="批量跑配置，产出对比表")
+    ab = sub.add_parser("ablate", parents=[common], help="批量跑配置，产出对比表")
     ab.add_argument("--configs", nargs="+", required=True)
     ab.add_argument("--level", default="rag",
                     choices=["no_rag", "full_context", "rag"])
@@ -603,7 +697,7 @@ def build_parser() -> argparse.ArgumentParser:
     ab.set_defaults(func=cmd_ablate)
 
     # ---- 主分支（自己仿写的 agent）----
-    ag = sub.add_parser("agent", help="跑一次主分支 agent，并打印轨迹")
+    ag = sub.add_parser("agent", parents=[common], help="跑一次主分支 agent，并打印轨迹")
     ag.add_argument("question")
     ag.add_argument("--show-hits", action="store_true", help="展示召回的片段")
     ag.add_argument("--max-turns", type=int, default=0,
@@ -615,7 +709,7 @@ def build_parser() -> argparse.ArgumentParser:
                     help="用假的决策模型，完全不联网")
     ag.set_defaults(func=cmd_agent)
 
-    ae = sub.add_parser("agent-eval", help="用同一把尺子量主分支 agent")
+    ae = sub.add_parser("agent-eval", parents=[common], help="用同一把尺子量主分支 agent")
     ae.add_argument("--dataset", default=None)
     ae.add_argument("--top-k", type=int, default=5)
     ae.add_argument("--limit", type=int, default=0)
@@ -626,7 +720,7 @@ def build_parser() -> argparse.ArgumentParser:
     ae.set_defaults(func=cmd_agent_eval)
 
     # ---- 终端演示（面试 / 展示用）----
-    dm = sub.add_parser("demo", help="终端演示：把 agent 的执行过程实时画出来")
+    dm = sub.add_parser("demo", parents=[common], help="终端演示：把 agent 的执行过程实时画出来")
     dm.add_argument("question", nargs="*",
                     help="要问的问题；不给就进交互模式")
     dm.add_argument("--list", action="store_true", help="只列示例问题，不运行")
@@ -640,6 +734,24 @@ def build_parser() -> argparse.ArgumentParser:
     dm.add_argument("--fake-chat", action="store_true",
                     help="用假的决策模型，完全不联网（演示与录屏都用它）")
     dm.set_defaults(func=cmd_demo)
+
+    # ---- 配置 ----
+    st = sub.add_parser("setup", parents=[common], help="配置向导 / 配置体检")
+    st.add_argument("--check", action="store_true",
+                    help="只报告当前生效的配置，不改动任何东西")
+    st.add_argument("--probe", action="store_true",
+                    help="配合 --check：真的连一次，确认端点可达")
+    st.add_argument("--list-presets", action="store_true", help="列出可选组合")
+    st.add_argument("--preset", default="", help="跳过选择，直接用某个预设")
+    st.add_argument("--chat-base-url", default=None)
+    st.add_argument("--chat-model", default=None)
+    st.add_argument("--chat-key", default=None)
+    st.add_argument("--embed-base-url", default=None)
+    st.add_argument("--embed-model", default=None)
+    st.add_argument("--embed-key", default=None)
+    st.add_argument("--no-probe", action="store_true",
+                    help="跳过连通性自检（离线环境下会用）")
+    st.set_defaults(func=cmd_setup)
     return p
 
 
