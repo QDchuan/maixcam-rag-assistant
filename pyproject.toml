@@ -27,7 +27,7 @@ dev = ["pytest>=8.0"]
 maixrag = "maixrag.cli:main"
 
 [tool.setuptools]
-packages = ["maixrag", "maixrag.corpus", "maixrag.indexing", "maixrag.evaluation"]
+packages = ["maixrag", "maixrag.agent", "maixrag.corpus", "maixrag.indexing", "maixrag.evaluation"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
