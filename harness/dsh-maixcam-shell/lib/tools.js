@@ -69,13 +69,17 @@ function renderHits(result) {
 			'',
 		]
 		for (const f of result.facets) {
-			const tag = f.confidence === 'strong' ? '证据充分' : f.confidence === 'medium' ? '证据一般' : '**证据薄弱**'
+			// LLM 自动扩展出来的面向没有 confidence（那是显式 aspects 才有的判据），
+			// 标成「关联面向」而不是假装它是充分证据。
+			const tag = f.confidence === undefined
+				? '关联面向'
+				: f.confidence === 'strong' ? '证据充分' : f.confidence === 'medium' ? '证据一般' : '**证据薄弱**'
 			if (f.confidence === 'weak') {
 				out.push(`## ${f.aspect} —— ${tag}（最高相似度 ${f.topCosine}）`)
 				out.push('    本地知识库里**很可能没有**这一块的内容，下面这几条只是最近邻、并不真的相关。')
 				out.push('    必须在回答里明说这个子系统缺乏本地依据，不要拿这几条凑数、更不要凭印象补全。')
 			} else {
-				const mods = f.coverage.hit.map((h) => `${h.module}(${h.n})`).join(' ')
+				const mods = (f.coverage?.hit ?? []).map((h) => `${h.module}(${h.n})`).join(' ')
 				out.push(`## ${f.aspect} —— ${tag}（命中 ${f.n} 条 · 最高相似度 ${f.topCosine} · 模块 ${mods}）`)
 				for (const [i, h] of f.hits.entries()) {
 					const where = [h.doc_title || h.doc_id, ...(h.heading_path ?? [])]

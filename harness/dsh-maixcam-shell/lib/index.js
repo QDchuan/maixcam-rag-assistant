@@ -32,6 +32,7 @@ import {
 	topK,
 } from './corpus.js'
 import { rrf } from './bm25.js'
+import { expandQuery, readCredential } from './expand.js'
 import { createCorpusTools, unavailable } from './tools.js'
 import { checkSymbols } from './symbols.js'
 
@@ -55,6 +56,17 @@ const DEFAULTS = {
 	topK: 5,
 	/** 单次嵌入调用的超时。 */
 	embedTimeoutMs: 20000,
+	/** 语义扩展用的 LLM（OpenAI 兼容）。留空则退回单查询。 */
+	expandBaseUrl: '',
+	/** 扩展用的模型名。 */
+	expandModel: '',
+	/** 从凭据文件里取的键名。 */
+	expandApiKeyRef: 'DEEPSEEK_API_KEY',
+	/** 凭据文件路径（本应用自己 home 下的那个）。 */
+	credentialsFile: '',
+	/** 扩展调用超时。 */
+	expandTimeoutMs: 20000,
+
 	/** 是否把检索能力注册成 agent 工具。 */
 	enableTools: true,
 	/** agent 工具的单次调用超时。 */
@@ -193,16 +205,27 @@ export function apply(ctx, config) {
 		const embedMs = Date.now() - started
 
 		// 两路各多取一些再融合：只在 k 条上融合，会丢掉「另一路排第 8」的好结果。
-		const pool = Math.max(k * 3, 12)
+		const pool = Math.max(k * 4, 24)
 		const dense = topK(c, vector, pool)
 		const sparse = c.bm25.search(text, pool)
 
-		const hits = rrf([dense, sparse], k).map((hit) => ({
-			...toEvidence(c, hit),
+		// 按 RRF 名次取候选，再**每篇文档最多留 2 条**。
+		//
+		// 实测过的问题：k=6 的 6 条里 5 条来自「人脸追踪2轴云台」同一篇 ——
+		// 于是「6 条命中」其实只覆盖了 1 个来源，看着检索到了东西，其实没有广度。
+		// 按文档限流之后，同样的 k 能覆盖更多篇。候选池同时放宽到 k×4（下限 24）。
+		const PER_DOC_CAP = 2
+		const perDoc = new Map()
+		const hits = []
+		for (const hit of rrf([dense, sparse], Math.max(k * 4, 24))) {
+			const evidence = toEvidence(c, hit)
+			const used = perDoc.get(evidence.doc_id) ?? 0
+			if (used >= PER_DOC_CAP) continue
+			perDoc.set(evidence.doc_id, used + 1)
 			// 每一路各给了第几名 —— 让「这条为什么被选中」可见。
-			from: hit.from,
-			fused: Number(hit.score.toFixed(5)),
-		}))
+			hits.push({ ...evidence, from: hit.from, fused: Number(hit.score.toFixed(5)) })
+			if (hits.length >= k) break
+		}
 		// 最高余弦：稠密那一路的绝对相似度，跨查询可比（RRF 分数不可比）。
 		const topCosine = dense.length > 0 ? dense[0].score : 0
 		return { hits, embedMs, topCosine }
@@ -247,6 +270,33 @@ export function apply(ctx, config) {
 		if (aspects.length === 0) {
 			const { hits, embedMs } = await hybrid(c, query, k)
 
+			// ── 前置语义扩展：**先让模型把问题拆开，再逐面做向量匹配** ──────────
+			//
+			// 为什么必须由模型来做：向量做不出这个关联（实测稠密检索把「人脸追踪2轴云台」
+			// 端上来就停了）；而检索层自己用标题词面重合去猜也不成立（伪关联一堆）。
+			// 模型天然会联想 —— 用户观察到它自己打出过「总线舵机 串口舵机 舵机供电 外部电源 电压」。
+			//
+			// 扩展失败一律退回单查询结果，不抛错：扩展是增强，不是必需。
+			let facets = []
+			if (settings.expandBaseUrl !== '' && settings.expandModel !== '') {
+				const apiKey = readCredential(settings.credentialsFile, settings.expandApiKeyRef)
+				const aspects = await expandQuery(
+					{
+						baseUrl: settings.expandBaseUrl,
+						model: settings.expandModel,
+						apiKey,
+						timeoutMs: settings.expandTimeoutMs,
+					},
+					query,
+				)
+				if (aspects.length > 0) {
+					for (const aspect of aspects) {
+						const { hits: facetHits } = await hybrid(c, aspect, k)
+						facets.push({ aspect, n: facetHits.length, coverage: moduleCoverage(c, facetHits), hits: facetHits })
+					}
+				}
+			}
+
 			return {
 				query,
 				k,
@@ -254,7 +304,9 @@ export function apply(ctx, config) {
 				embedMs,
 				totalMs: Date.now() - started,
 				// 设计类问题却只查了一次 —— 交给渲染层把「你先拆子系统」这道门竖起来。
-				needsAspects: looksLikeDesignTask(query),
+				needsAspects: facets.length === 0 && looksLikeDesignTask(query),
+				expandedBy: facets.length > 0 ? settings.expandModel : '',
+				facets,
 				coverage: moduleCoverage(c, hits),
 				hits,
 			}
