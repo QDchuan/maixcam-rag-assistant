@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "MaixCAM 开发助手 —— RAG 与 Agent 教学项目"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "Apache-2.0" }
+license = { file = "LICENSE" }
 
 # 刻意保持精简。每一个依赖都要能对读者解释清楚为什么需要它，
 # 以及它替代了什么手写代码（见 docs/design/01 第 1.3 节：不用编排框架）。

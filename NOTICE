@@ -1,0 +1,37 @@
+maixcam-rag-assistant
+Copyright 2026 QDchuan
+
+This product includes software developed as part of the
+maixcam-rag-assistant project (https://github.com/QDchuan/maixcam-rag-assistant).
+
+--------------------------------------------------------------------------------
+Third-party content
+--------------------------------------------------------------------------------
+
+1. MaixPy documentation corpus
+   Source:  https://github.com/sipeed/MaixPy  (docs/doc/zh, docs/doc/en)
+   License: Apache License 2.0
+   Copyright (c) 2023- Sipeed Ltd.
+
+   The project's corpus pipeline downloads this documentation at build time and
+   performs format normalization (Markdown parsing, structure-aware chunking,
+   metadata annotation). The original documentation is NOT redistributed in this
+   repository; only the acquisition scripts and a manifest recording the upstream
+   commit and per-file hashes are included.
+
+2. MaixPy API reference pages
+   Source:  https://wiki.sipeed.com/maixpy/api/
+   License: see the upstream site
+   Notes:   These pages are generated from MaixPy source docstrings. The project
+            fetches them at build time to extract exact API signatures for
+            hallucination checking. They are NOT redistributed in this repository.
+            Users are expected to fetch or build them themselves; see
+            docs/design/01-系统架构设计.md for the licensing discussion.
+
+3. Runtime dependencies
+   numpy (BSD-3-Clause), PyYAML (MIT), markdown-it-py (MIT), jieba (MIT),
+   pytest (MIT). See each package for its license text.
+
+--------------------------------------------------------------------------------
+
+The Apache License 2.0 that applies to this project's own code is in LICENSE.
