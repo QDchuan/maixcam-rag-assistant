@@ -444,7 +444,7 @@ window.__ModuleLoader__.load({
 					? h(
 							'div',
 							{ className: 'dsh-mx-note' },
-							`基准命中 ${result.hits.length} 条 · ${result.strategy}`,
+							`命中 ${result.hits.length} 篇文档 · ${result.strategy}`,
 							result.expandedBy
 								? ` · 已由 ${result.expandedBy} 自动扩展为 ${result.facets.length} 个面向`
 								: '',

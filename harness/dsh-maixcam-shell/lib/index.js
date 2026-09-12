@@ -232,6 +232,68 @@ export function apply(ctx, config) {
 	}
 
 	/**
+	 * **按文档聚合的召回式检索**：过阈值的文档全给，不设 6 条这种上限。
+	 *
+	 * ## 为什么不是 top-k
+	 *
+	 * 原先 k 被当成上限用 —— 「给你 6 条」。那是**精度**思路（挑几条最像的塞给模型），
+	 * 对一个「怎么设计 X」的工程问题是不对的：这个系统牵扯到的每一篇文档都该被找到，
+	 * 而不是挑 6 条出来、剩下的**静默丢掉**。
+	 *
+	 * 改成：候选取全部稠密打分（3838 条全排序）+ 稀疏前 300，RRF 融合后
+	 * **按 doc_id 聚合成文档**（每篇留它最好的那一片），
+	 * 再按稠密余弦过一道下限 —— 过线的**全给**（上限 40 篇，只是防爆）。
+	 *
+	 * 「命中几篇」于是由语料本身的分布决定，不由我拍一个数字决定。
+	 *
+	 * @param c - 语料句柄。
+	 * @param text - 查询词。
+	 * @param options - `floor` 余弦下限，`cap` 文档数上限。
+	 * @returns `{ docs, embedMs }`。
+	 */
+	async function sweep(c, text, options = {}) {
+		// 0.65 是从实测分布里选的：0.60 会放进 57 篇（噪声明显），
+		// 0.70 只剩 5 篇（太窄）。取 0.65 时「设计一个二维云台人脸跟随系统」
+		// 命中 27 篇，正好覆盖云台页 + PWM + 人脸检测系列 + UART + PINMAP + GPIO + I2C + SPI + 摄像头。
+		const floor = options.floor ?? 0.65
+		const cap = options.cap ?? 40
+		const started = Date.now()
+		const vector = await embed(
+			{
+				baseUrl: settings.embedBaseUrl,
+				model: settings.embedModel,
+				apiKey: settings.embedApiKey,
+				timeoutMs: settings.embedTimeoutMs,
+			},
+			text,
+		)
+		const embedMs = Date.now() - started
+
+		// 稠密全量排序（3838 条），拿到每条切片的绝对余弦 —— 阈值得靠它，RRF 分数不可比。
+		const denseAll = topK(c, vector, c.chunks.length)
+		const cosine = new Map(denseAll.map((h) => [h.index, h.score]))
+		const sparse = c.bm25.search(text, 300)
+		const fused = rrf([denseAll.slice(0, 300), sparse], 300)
+
+		const bestPerDoc = new Map()
+		for (const hit of fused) {
+			const cos = cosine.get(hit.index) ?? 0
+			if (cos < floor) continue
+			const evidence = toEvidence(c, hit)
+			const prev = bestPerDoc.get(evidence.doc_id)
+			if (prev === undefined || cos > prev.cos) {
+				bestPerDoc.set(evidence.doc_id, {
+					...evidence,
+					cos: Number(cos.toFixed(4)),
+					from: hit.from,
+				})
+			}
+		}
+
+		const docs = [...bestPerDoc.values()].sort((a, b) => b.cos - a.cos).slice(0, cap)
+		return { docs, embedMs, scanned: c.chunks.length }
+	}
+	/**
 	 * 跑一次检索：**稠密 + 稀疏，RRF 融合**，并附一份模块覆盖度。
 	 *
 	 * 路由和 agent 工具共用这一条路径 —— 只有一份实现，界面看到的和模型看到的
@@ -268,7 +330,9 @@ export function apply(ctx, config) {
 		const started = Date.now()
 
 		if (aspects.length === 0) {
-			const { hits, embedMs } = await hybrid(c, query, k)
+			// 召回式：过阈值的文档全给，不按 k 截断。
+			const { docs, embedMs } = await sweep(c, query, {})
+			const hits = docs
 
 			// ── 前置语义扩展：**先让模型把问题拆开，再逐面做向量匹配** ──────────
 			//
@@ -291,8 +355,13 @@ export function apply(ctx, config) {
 				)
 				if (aspects.length > 0) {
 					for (const aspect of aspects) {
-						const { hits: facetHits } = await hybrid(c, aspect, k)
-						facets.push({ aspect, n: facetHits.length, coverage: moduleCoverage(c, facetHits), hits: facetHits })
+						const { docs: facetDocs } = await sweep(c, aspect, {})
+						facets.push({
+							aspect,
+							n: facetDocs.length,
+							coverage: moduleCoverage(c, facetDocs),
+							hits: facetDocs,
+						})
 					}
 				}
 			}
@@ -307,6 +376,7 @@ export function apply(ctx, config) {
 				needsAspects: facets.length === 0 && looksLikeDesignTask(query),
 				expandedBy: facets.length > 0 ? settings.expandModel : '',
 				facets,
+				docCount: hits.length,
 				coverage: moduleCoverage(c, hits),
 				hits,
 			}
@@ -314,7 +384,9 @@ export function apply(ctx, config) {
 
 		const facets = []
 		for (const aspect of aspects) {
-			const { hits, topCosine } = await hybrid(c, aspect, k)
+			const { docs } = await sweep(c, aspect, {})
+			const hits = docs
+			const topCosine = docs.length > 0 ? docs[0].cos : 0
 			facets.push({
 				aspect,
 				n: hits.length,
@@ -322,6 +394,7 @@ export function apply(ctx, config) {
 				// 置信度分三档，不做二值判断。阈值 0.60 是从实测分布里取的：
 				// 真有证据的面落在 0.73~0.81，本地没有的面落在 0.52~0.56。
 				confidence: topCosine >= 0.7 ? 'strong' : topCosine >= 0.6 ? 'medium' : 'weak',
+				docCount: hits.length,
 				coverage: moduleCoverage(c, hits),
 				hits,
 			})
