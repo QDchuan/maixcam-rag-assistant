@@ -403,8 +403,8 @@ def cmd_demo(args: argparse.Namespace) -> int:
     """
     from .agent.app import AgentProfile, agent_stats
     from .agent.tui import (
-        CONTACT, TerminalPresenter, TuiPlugin, banner, build_banner_stats,
-        color_wanted, disable_color, ensure_ansi,
+        C_DIM, CONTACT, RESET, TerminalPresenter, TuiPlugin, banner,
+        build_banner_stats, color_wanted, disable_color, ensure_ansi,
     )
 
     ensure_ansi()
@@ -425,8 +425,20 @@ def cmd_demo(args: argparse.Namespace) -> int:
               f"\"{DEMO_QUESTIONS[3]}\"{RESET}\n")
         return 0
 
+    # 装配要几秒（加载 3838 个 chunk 与 1024 维向量索引）。
+    # **空屏会被当成卡死**——第一秒决定别人会不会等下去，所以先给一行字。
+    #
+    # 只在 TTY 上做，因为擦除靠 `\r` 回车：被重定向到文件时 `\r` 不起作用，
+    # 那句话会连同一串空格永久留在输出里污染管道。
+    # （教学点：凡是"原地刷新"，都必须先问一句"这里是不是终端"。）
+    live = _is_tty(sys.stdout)
+    if live:
+        print(f"{C_DIM}  正在装配 agent（加载语料与索引）…{RESET}",
+              end="", flush=True)
     cfg = Config.load(args.config, project_root=Path.cwd())
     app = _build_main_branch_agent(cfg, args)
+    if live:
+        print("\r" + " " * 56 + "\r", end="", flush=True)
 
     # 把呈现层作为插件挂进一个**隔离域**。
     #
@@ -514,6 +526,19 @@ def _avg_tool_calls(report, app) -> str:
     """
     n = len(report.items) or 1
     return f"{app.total_tool_calls / n:.1f} 次/题"
+
+
+def _is_tty(stream) -> bool:
+    """这个流是不是真的终端。
+
+    **凡是"原地刷新"（`\\r`、进度条、清屏）都必须先问这一句。**
+    被重定向到文件或管道时，`\\r` 不会擦掉任何东西，
+    那些控制字符会永久留在输出里污染下游。
+    """
+    try:
+        return bool(stream.isatty())
+    except Exception:
+        return False
 
 
 def build_parser() -> argparse.ArgumentParser:
