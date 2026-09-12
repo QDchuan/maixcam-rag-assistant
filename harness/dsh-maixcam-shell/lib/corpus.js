@@ -237,6 +237,8 @@ export function loadCorpus({ root }) {
 		byQualname,
 		byName,
 		roster,
+		/** 白名单的集合形态：符号校验要按名字查很多次，用 Set 而不是数组。 */
+		rosterSet: new Set(roster),
 		stats: {
 			chunks: chunks.length,
 			dim: cols,

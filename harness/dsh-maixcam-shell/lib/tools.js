@@ -33,6 +33,7 @@
  */
 
 import { defineTool } from '@deepseek-ai/dsh-tools'
+import { checkSymbols } from './symbols.js'
 
 /**
  * 把一段正文压成一行。
@@ -77,12 +78,65 @@ function renderHits(result) {
 }
 
 /**
+ * 把符号校验的结果渲染成给人读的文本。
+ *
+ * 三种结局必须**在文字上分得开**，因为它们对模型意味着完全不同的下一步：
+ *
+ * - 全部存在 → 可以交付；
+ * - 发现不存在的符号 → 去 `lookup_api` 查真的，或删掉；
+ * - **校验器自己失效**（一段明显是 MaixPy 的代码里一个符号都没解析出来）
+ *   → 这一关**没有通过**，不许当成"没问题"。
+ *
+ * 第三种是教学主线的事故 01：一个静默放行的防幻觉校验，比没有校验更危险 ——
+ * 它给了模型和人一个虚假的安心。
+ *
+ * @param result - `{ unknown, checked }`。
+ * @param code - 被检查的代码，用来判断"这是不是一段 MaixPy 代码"。
+ * @returns 内容块。
+ */
+function renderCheck(result, code) {
+	const { unknown, checked } = result
+	if (checked === 0) {
+		const looksLikeMaix = /maix|gpio|camera/i.test(code)
+		if (looksLikeMaix) {
+			return [
+				{
+					type: 'text',
+					text:
+						'第一级校验没能从这段代码里解析出任何 maix 符号，但它看起来确实在用 MaixPy。'
+						+ '**这表示校验器失效了，不等于代码通过。**'
+						+ '请改用 `lookup_api` 逐个确认符号。',
+				},
+			]
+		}
+		return [
+			{
+				type: 'text',
+				text: '代码里没有出现可校验的 maix 符号（没有 `maix.*` 引用，也没有从 maix 导入后的调用）。',
+			},
+		]
+	}
+	if (unknown.length === 0) {
+		return [{ type: 'text', text: `检查了 ${checked} 个符号，全部存在于官方 API 名单。` }]
+	}
+	const lines = [`检查了 ${checked} 个符号，发现 ${unknown.length} 个不存在：`]
+	for (const u of unknown) lines.push(`  · ${u}`)
+	lines.push('')
+	lines.push(
+		'**这些符号在官方文档里不存在，属于编造。**'
+			+ '请用 `lookup_api` 查到真实 API 再改，或删除相关代码；不要把名字改得像一点就交。',
+	)
+	return [{ type: 'text', text: lines.join('\n') }]
+}
+
+/**
  * 造出这一组工具。
  *
  * @param deps - 依赖。
  * @param {() => Promise<object>} deps.getCorpus - 取语料句柄（惰性加载）。
  * @param {(text: string, k: number) => Promise<object>} deps.search - 跑一次检索。
  * @param {(name: string) => Promise<object>} deps.lookup - 查一个符号。
+ * @param {(code: string) => Promise<object>} deps.check - 校验一段代码里的符号。
  * @param {() => number} deps.getTimeoutMs - 单次调用超时。
  * @returns 工具定义数组。
  */
@@ -163,6 +217,36 @@ export function createCorpusTools(deps) {
 			isConcurrencySafe: () => true,
 			async execute(args) {
 				return deps.lookup(String(args.name ?? ''))
+			},
+		}),
+
+		defineTool({
+			name: 'check_api_usage',
+			description:
+				'把一整段 MaixPy 代码丢进来，校验里面出现的 maix 符号是否都真实存在。'
+				+ '它会解析导入别名（`from maix import camera` 之后的 `camera.Camera()`）和单层构造赋值'
+				+ '（`cam = camera.Camera()` 之后的 `cam.read()`），所以能抓住编造模块成员与编造实例方法'
+				+ '这两类最常见的幻觉。**给用户交付代码之前必须调用它**；返回"发现不存在的符号"时，'
+				+ '不要改个更像的名字就交，要先用 `lookup_api` 查到真的。',
+			parameters: {
+				code: {
+					type: 'string',
+					description: '要校验的 MaixPy 代码（整段源码，不需要 markdown 围栏）。',
+					required: true,
+				},
+			},
+			output: {
+				schema: { type: 'json' },
+				render: (_args, value) => renderCheck(value, String(_args.code ?? '')),
+			},
+			timeoutMs: deps.getTimeoutMs(),
+			isConcurrencySafe: () => true,
+			async execute(args) {
+				const code = String(args.code ?? '')
+				if (code.trim() === '') {
+					throw new Error('code 不能为空。')
+				}
+				return deps.check(code)
 			},
 		}),
 	]

@@ -1,0 +1,17 @@
+# 把某个 profile 的默认 agent preset 换成「MaixCAM 开发助手」。
+#
+# 用法（`--patch` 是叠在 profile 用户层之后的额外补丁，可以重复给）：
+#
+#     dsh --profile web --patch harness/maixcam-default.yml
+#
+# 什么时候需要它：不挂这一层时，新建会话默认还是「标准模式」——
+# 那样你得到的只是一个**多了个知识库面板**的通用编码 agent，
+# 而不是带着检索纪律的 MaixCAM 助手。纪律在 preset 里，不在壳里。
+#
+# 不想全局改默认值就用这一层（只在本次启动生效）；
+# 想长期生效就把它写进自己的 profile 补丁层，或者直接改设置里的
+# `agent-presets.default`。
+
+- id: agent-presets
+  config:
+    default: maixcam-assistant

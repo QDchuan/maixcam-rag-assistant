@@ -31,6 +31,7 @@ import {
 	topK,
 } from './corpus.js'
 import { createCorpusTools, unavailable } from './tools.js'
+import { checkSymbols } from './symbols.js'
 
 /** 需要连接服务来注册 `/api` 路由。 */
 export const inject = ['connection']
@@ -255,6 +256,17 @@ export function apply(ctx, config) {
 			lookup: async (name) => {
 				try {
 					return { name, ...lookupSymbol(await ensureCorpus(), name) }
+				} catch (error) {
+					throw new CorpusError(unavailable(error))
+				}
+			},
+			check: async (code) => {
+				try {
+					const c = await ensureCorpus()
+					// `assumeCode: true` —— 工具收到的是裸源码，没有 markdown 围栏。
+					// 教学主线的事故 01 就出在这个参数上：不显式声明，校验器会对
+					// 裸代码返回「检查了 0 个符号」，而 0 被当成通过。
+					return checkSymbols(code, c.rosterSet, { assumeCode: true })
 				} catch (error) {
 					throw new CorpusError(unavailable(error))
 				}

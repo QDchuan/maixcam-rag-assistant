@@ -26,17 +26,48 @@
 ```
 harness/
   dsh-maixcam-shell/     dsh Web 插件包 —— 这就是「壳」
-    lib/index.js         宿主半边：语料接入点、三条 /api 路由、两个 agent 工具
+    lib/index.js         宿主半边：语料接入点、三条 /api 路由、三个 agent 工具
     lib/corpus.js        加载与校验构建期产物；嵌入 + 余弦检索
-    lib/tools.js         agent 工具：search_docs / lookup_api
+    lib/symbols.js       符号白名单校验（硬防幻觉），与教学主线 Python 版逐函数对齐
+    lib/tools.js         agent 工具：search_docs / lookup_api / check_api_usage
     lib/client.js        浏览器半边：品牌 + 知识库面板（手写 lazy-CJS bundle，无构建）
     cordis.patch.yml     bundle 层，供 `dsh plugin add` 使用
   maixcam-assistant/     agent preset —— 这个助手的「人格与纪律」
     agent.cordis.yml     随包 `standard` preset 的副本，只改了 persona 那一行
     preset.yml           显示名与描述
+  maixcam-default.yml    可选补丁层：把默认 preset 换成 MaixCAM 开发助手
+  start.cmd              Windows 启动器（纯 ASCII —— cmd.exe 用 ANSI 码页解析 .cmd）
   tools/eyes.mjs         无头浏览器验证工具：读文本、量元素、截图
+  tests/                 符号校验器的回归测试 + 与 Python 原版的对拍
   install.py             装上面两样（也可 --check / --uninstall）
 ```
+
+## 启动它
+
+Windows 上双击 / 执行：
+
+```bat
+harness\start.cmd          :: 起在 8787
+harness\start.cmd 9000     :: 换端口
+```
+
+它 boot 这个 web profile 并叠上 `maixcam-default.yml`，然后打开浏览器。
+等价的手工命令是：
+
+```bash
+dsh --profile web --patch harness/maixcam-default.yml --port 8787
+```
+
+> **注意参数顺序**：`--patch` 是 dsh **启动器**的选项，必须写在 `--port` 这类
+> **应用**选项之前。写反了会得到 `error: unknown option '--patch'` ——
+> 因为启动器已经把后面的参数整体转发给应用了。
+
+**默认 preset 这件事要留意**：`maixcam-default.yml` 与 `settings.yaml` 里的
+`agent-presets.default` 都指向 `maixcam-assistant`，但实测在新会话里，
+首页那个 preset 控件仍然显示「创造模式」。我没有查出它到底从哪里取值，
+所以**不要依赖自动默认**——点一下 picker 选「MaixCAM 开发助手」是确定有效的。
+（纪律在 preset 里，不在壳里；不选 preset，你拿到的是一个多了知识库面板的通用编码 agent。）
+
 
 ## 装它
 
@@ -74,8 +105,38 @@ python -m harness.install --uninstall  # 撤回
 | --- | --- |
 | **先查再答** —— 回答前先 `search_docs` | 凭记忆编 API |
 | **先核对再用** —— 写 API 名字前先 `lookup_api` | 写出看起来很合理的名字 |
+| **交付前必须自检** —— 整段代码过一遍 `check_api_usage` | 名字错了却没人发现 |
 | **答必带出处** —— 写明文档标题或 URL | 「根据文档」这种无法核对的引用 |
 | **查不到就说不知道** —— 不用合理代码填空 | 用编造的代码把空白填上 |
+
+前四条里，**第二条和第三条是硬的**：`check_api_usage` 由机器判，不由模型说了算。
+
+### `check_api_usage`：把「防幻觉」从自律变成校验
+
+`lib/symbols.js` 是教学主线 `maixrag/evaluation/harness.py` 的**逐函数移植**，
+两边用同一套判据 —— 否则评测说「通过」、线上说「幻觉」，就没人知道该信哪个。
+`harness/tests/symbols_parity.py` 就是守这条线的：同一批代码样本喂给两个实现，比对结果。
+
+它抓三类写法，缺一个就等于对最常见的一类代码失明：
+
+```python
+maix.image.Image()                    # 1. 全限定名
+from maix import camera
+camera.Camera()                       # 2. 模块别名
+cam = camera.Camera()
+cam.super_zoom()                      # 3. 实例方法（单层构造跟踪）
+```
+
+**边界也写清楚**：只做单层构造跟踪，不做控制流分析 —— `cam` 被重新赋值、
+从函数返回、或作为参数传进来之后，类型就丢了。它也不检查参数个数与类型。
+那些要真的跑一遍才有答案。
+
+跑测试：
+
+```bash
+node harness/tests/symbols.test.mjs       # 8 个用例，编码了每一个踩过的坑
+python harness/tests/symbols_parity.py    # 与 Python 原版对拍，7 个样本
+```
 
 > 复制而不是从零写，还有一个很实际的理由：**一份复制的组合开箱就是能挂载的。**
 > 从零写的组合通常会忘记某个 group realm，或者把消费者行留在 realm 外面。
@@ -215,18 +276,20 @@ parameters: { query: { type: 'string', description: '…', required: true } }
 
 ## 还没做的
 
-按价值排序，都记在 [`../docs/design/06-项目结构与两条分支.md`](../docs/design/06-项目结构与两条分支.md) §3：
+按价值排序：
 
-1. **`check_api_usage`**：把教学主线那份符号白名单校验（导入别名解析 + 实例类型推断）
-   接到运行期，这样模型写出来的整段代码可以被机器核对，而不是只核对单个符号。
-   现在这一环靠 `lookup_api` 逐个查 + 提示词里的自律，是软的。
-2. **检索轨迹 / 溯源面板**：`tool.call.toolview` 按工具名派发，可以在会话里就地
-   渲染「这次检索命中了什么」。目前工具结果是一段格式化文本，够读但不够好看。
-3. **稀疏 + 融合 + 重排**：需要先解决 §3.6.1 那个分词器边界（要么把 Python 检索
+1. **检索轨迹面板**（`tool.call.toolview` keyed 座位）：在会话里就地渲染「这次检索
+   命中了什么、各多少分」。工具结果目前是一段格式化文本，够读但不够好看。
+   `ToolCallBlock` 这个 owner prop 的类型不在已安装的 `.d.ts` 里，这一版没做。
+2. **稀疏 + 融合 + 重排**：需要先解决 §3.6.1 那个分词器边界（要么把 Python 检索
    做成服务，要么接受一份 JS 分词器）。
-4. **`maixcam` settings 命名空间**：现在配置写在 profile 补丁行里，改一次要重装。
-5. **preset 瘦身**：现在直接照搬了 `standard` 的全部能力（子代理、工作流、Ralph…）。
+3. **`maixcam` settings 命名空间**：现在配置写在 profile 补丁行里，改一次要重装。
+   客户端 `settingsScope` 的 API 也没在已安装的 `.d.ts` 里，同样没做。
+4. **preset 瘦身**：现在直接照搬了 `standard` 的全部能力（子代理、工作流、Ralph…）。
    对一个 MaixCAM 助手，其中一部分是噪音；但删行要连着处理 realm 与消费者，
    在一份能挂载的副本上「按需增删」比从头裁剪安全得多。
+5. **默认 preset 没生效**：见上面的「启动它」。点一次 picker 是可用的替代，
+   但真要把它做成产品，这一处得查清楚。
+
 
 
