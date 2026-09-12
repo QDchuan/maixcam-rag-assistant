@@ -53,38 +53,37 @@ CANDIDATES = [
 
 SHIM = """@echo off
 rem ---------------------------------------------------------------------------
-rem {name} —— MaixCAM 开发助手的终端演示
+rem {name} -- MaixCAM assistant terminal demo
 rem
-rem **这个文件是生成的，别手改。** 它由下面这条命令写出来：
-rem     {installer}
-rem 仓库挪了位置就重跑那条命令，不要来改这里的路径。
+rem GENERATED FILE. DO NOT EDIT BY HAND.
+rem Written by:  {installer}
+rem Moved the repo? Re-run that script instead of editing the path below.
+rem
+rem ASCII-ONLY ON PURPOSE. cmd.exe parses a .cmd using the code page that is
+rem active at start -- here GBK, not UTF-8. UTF-8 Chinese comments get misread
+rem byte by byte, and a mangled "rem" line becomes
+rem   'em' is not recognized as an internal or external command
+rem I hit exactly that once already in demo-adjacent scripts; do not put
+rem non-ASCII in this file.
 rem ---------------------------------------------------------------------------
 setlocal
 set "REPO={repo}"
 set "EXE=%REPO%\\.venv\\Scripts\\{name}.exe"
 
-rem **调入口点，不要写死 `-m maixrag demo`。**
-rem
-rem 第一版我写的是 `python -m maixrag demo %*`，于是
-rem `maixcam_agent setup --check` 变成了 `demo setup --check`，报一个
-rem 看不懂的 "unrecognized arguments"。
-rem 而 `--list` 碰巧能过（demo 本来就认 --list）——
-rem **所以我第一次测的那条路径是假的，"子命令"那条才是真的。**
-rem
-rem 入口点走的是 `cli.main_demo`，它自己判断"这是子命令还是一个提问"。
-rem 那套分派逻辑只应该存在一个地方。
-
 if not exist "%EXE%" (
-  echo [maixcam_agent] 找不到 %EXE%
+  echo [{name}] cannot find %EXE%
   echo.
-  echo 这个 shim 记的是生成时的路径：%REPO%
-  echo 仓库如果挪了位置，先装一次入口点、再重跑安装脚本：
-  echo   cd ^<仓库新位置^>
+  echo This shim remembers the path from install time: %REPO%
+  echo If the repo moved, reinstall the entry point and re-run:
+  echo   cd ^<new repo path^>
   echo   .venv\\Scripts\\pip.exe install -e . --no-deps
   echo   .venv\\Scripts\\python.exe scripts\\install_command.py
   exit /b 2
 )
 
+rem Call the ENTRY POINT. Do not hardcode "-m maixrag demo" here: a first
+rem version did that and broke `{name} setup --check` (it became
+rem `demo setup --check`). Dispatch lives in cli.py only.
 "%EXE%" %*
 """
 
@@ -120,6 +119,23 @@ fi
 
 exec "$EXE" "$@"
 """
+
+
+def _ansi_encoding() -> str:
+    """cmd.exe 解析 `.cmd` 时用的那个编码。
+
+    不是 UTF-8。Windows 上批处理文件按**当前 ANSI 代码页**读，
+    中文系统是 cp936（GBK）。写文件时用错编码，中文注释会被逐字节读错，
+    甚至把 `rem` 切成 `r` + `em`，报一句 `'em' 不是内部或外部命令`——
+    看起来和代码毫无关系，极难定位。
+    """
+    if os.name != "nt":
+        return "utf-8"
+    try:
+        import ctypes
+        return f"cp{ctypes.windll.kernel32.GetACP()}"
+    except Exception:  # noqa: BLE001
+        return "utf-8"
 
 
 def on_path(directory: Path) -> bool:
@@ -174,26 +190,40 @@ def install() -> int:
 
     shim = d / f"{NAME}.cmd"
     installer = (f"{ROOT}\\.venv\\Scripts\\python.exe scripts\\install_command.py")
+    # **用 cmd 期望的编码写，不是 UTF-8，也不是 ASCII。**
+    #
+    # cmd.exe 按**启动时生效的 ANSI 代码页**解析 .cmd（中文 Windows 上是 GBK/cp936）。
+    # 用 UTF-8 写，中文注释会被逐字节读错，`rem` 被切成 `r` + `em`，
+    # 报 `'em' 不是内部或外部命令`——我为此排查了一整轮。
+    #
+    # 而"纯 ASCII"也走不通：**这个仓库的路径本身就含中文**
+    # （`...\语音输入插件\RAG项目实战`），ASCII 编码直接抛 UnicodeEncodeError。
+    #
+    # 所以：注释保持 ASCII（零风险），路径按系统 ANSI 代码页编码（cmd 才读得对）。
     shim.write_text(SHIM.format(name=NAME, repo=ROOT, installer=installer),
-                    encoding="utf-8")
-    print(f"✓ 已写入 {shim}（cmd / PowerShell）")
+                    encoding=_ansi_encoding(), errors="replace")
 
-    # 同一个目录再放一个无扩展名的 sh 脚本给 Git Bash / WSL。
-    sh = d / NAME
-    sh.write_text(SHIM_SH.format(name=NAME, repo=ROOT, installer=installer),
-                  encoding="utf-8", newline="\n")
-    try:
-        sh.chmod(0o755)
-    except Exception:
-        pass
-    print(f"✓ 已写入 {sh}（Git Bash / WSL）")
-    print(f"  两者都调用：{exe}")
+    # **不要在同一目录再放一个同名的无扩展名 sh 脚本。**
+    #
+    # 加过一次，想照顾 Git Bash / WSL。结果是**把 cmd / PowerShell 弄坏了**：
+    # Windows 解析命令时先试完全同名的文件，找到了那个无扩展名的脚本，
+    # 而它执行不了 → 报"不是内部或外部命令"。
+    # 我为此排查了一轮才发现是自己造成的。
+    #
+    # Git Bash 用户改用 alias（在 ~/.bashrc 里加一行），不影响 Windows 的解析：
+    stale = d / NAME
+    if stale.exists():
+        stale.unlink()
+        print(f"  （已删除旧的无扩展名 shim {stale}——它会遮蔽 .cmd）")
+    print(f"✓ 已写入 {shim}")
 
-    # 当前这个进程的 PATH 里已经有那个目录了，直接试跑
     if shutil.which(NAME) is None:
-        print("⚠ 当前 shell 还没看到这个命令——**开一个新的终端**再试。")
+        print("⚠ 当前 shell 还没看到这个命令——开一个新的终端再试。")
     else:
         print(f"  已能被解析到：{shutil.which(NAME)}")
+    print()
+    print("Git Bash / WSL 用户：那边不认 .cmd，在 ~/.bashrc 加一行 alias 即可")
+    print(f'  alias {NAME}="cmd //c {NAME}"')
 
     print()
     print("用法（在任意目录、任意终端）：")
