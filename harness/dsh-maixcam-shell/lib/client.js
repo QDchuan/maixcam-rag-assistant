@@ -106,6 +106,10 @@ window.__ModuleLoader__.load({
 			'line-height:17px;text-align:center;background:rgba(127,127,127,.2)}',
 			'.dsh-mx-hit-doc{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
 			'.dsh-mx-hit-path{font-size:11px;opacity:.6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+			// 出处链接：不写颜色就会落到浏览器默认蓝（实测 rgb(0,0,238)），在深色底上很刺眼。
+			// 用主题的链接令牌，明暗两套都跟着走。
+			'.dsh-mx-hit a{color:var(--dsw-alias-link,#4de2ff);text-decoration-color:rgba(0,229,255,.4)}',
+			'.dsh-mx-hit a:hover{text-decoration-color:currentColor}',
 			'.dsh-mx-badge{flex:0 0 auto;padding:1px 6px;border-radius:5px;font-size:10px;line-height:15px;',
 			'border:1px solid rgba(127,127,127,.34);opacity:.75}',
 			'.dsh-mx-score{margin-left:auto;flex:0 0 auto;font-size:11px;opacity:.6;',
