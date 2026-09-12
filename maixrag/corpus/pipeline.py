@@ -193,6 +193,36 @@ class CorpusPipeline:
                 roster.add(s.qualname.rsplit(".", 1)[-1])
             for ref in extract_referenced_symbols(s.signature or ""):
                 roster.add(ref)
+
+        # 扁平别名 —— 这一条来自一次真实的假阳性事故。
+        #
+        # API 文档的**模块路径不等于用户实际 import 的路径**：
+        #   文档页    maix/peripheral/gpio.html  →  符号登记为 maix.peripheral.gpio.GPIO
+        #   官方教程  from maix import gpio       →  用户写 gpio.GPIO
+        #
+        # 只收文档路径会让校验器把 `from maix import gpio; gpio.GPIO` 这种
+        # **完全正确**的代码判成幻觉。而假阳性比漏报更糟：
+        # 用的人一旦发现它误报，就会把校验关掉，那它比没有更糟。
+        #
+        # 规则：模块 maix.A.B 的扁平形式是 maix.B（MaixPy 在 maix 顶层做了再导出）。
+        roster |= _flatten_aliases(roster)
+
+        # 语料里出现过但**没有 API 文档页**的模块也要收。
+        # 实测例子：from maix import sensevoice —— 模块真实存在，
+        # 但 wiki 上没有它的 API 页，所以从符号表里推不出来。
+        # 不收的话，用这个模块的正确代码会被判成幻觉（假阳性）。
+        discovered = discover_modules_from_corpus(self.raw_repo)
+        roster |= discovered
+        if discovered:
+            (self.reports / "roster_discovered.md").write_text(
+                "# 从语料里发现、但 API 文档未覆盖的模块\n\n"
+                "这些模块在教程里被 import，但 wiki 上没有对应 API 页，"
+                "因此符号表推不出它们。**它们的成员无法校验**——"
+                "这是已知的能力边界，写下来而不是让它安静地造成误报。\n\n"
+                + "\n".join(f"- `{m}`" for m in sorted(discovered)) + "\n",
+                encoding="utf-8",
+            )
+
         register_symbols(sorted(roster))
 
         docs, chunks = self._parse_tutorials(manifest)
@@ -225,6 +255,23 @@ class CorpusPipeline:
 
         self._write_stats(stats, chunks, symbols)
         self._write_diff(manifest)
+
+        # 白名单覆盖自检：报告语料里实际出现的 import 写法中，
+        # 哪些还没被白名单覆盖。**让"漏了什么"可见**，而不是安静地误报。
+        gaps = check_roster_covers_corpus(roster, self.raw_repo)
+        if gaps:
+            (self.reports / "roster_gaps.md").write_text(
+                "# 白名单覆盖缺口\n\n"
+                "以下是教程原文里实际出现的 import 写法，但白名单尚未覆盖。\n"
+                "**每一条缺口都可能让校验器把正确代码误判为幻觉。**\n\n"
+                + "\n".join(f"- `{g}`" for g in gaps) + "\n",
+                encoding="utf-8",
+            )
+        else:
+            (self.reports / "roster_gaps.md").write_text(
+                "# 白名单覆盖缺口\n\n未发现缺口：教程里出现的 import 写法都已覆盖。\n",
+                encoding="utf-8",
+            )
         return stats
 
     # -- 内部 --------------------------------------------------------------
@@ -392,6 +439,99 @@ class CorpusPipeline:
 # --------------------------------------------------------------------------
 # 工具
 # --------------------------------------------------------------------------
+
+
+def _flatten_aliases(names: set[str]) -> set[str]:
+    """给 `maix.A.B.*` 生成扁平别名 `maix.B.*`。
+
+    依据是语料自身的证据：官方教程里写的是 `from maix import gpio`，
+    而不是 `from maix.peripheral import gpio`。所以两种形式都必须被认可。
+
+    只对 `maix.` 开头的名字做，且只在模块层级 > 1 时做——
+    对 `maix.camera.Camera` 来说扁平形式还是它自己，加了也无害（集合去重）。
+    """
+    out: set[str] = set()
+    for name in names:
+        parts = name.split(".")
+        if len(parts) < 3 or parts[0] != "maix":
+            continue
+        # maix.peripheral.gpio.GPIO.get_mode
+        #   -> 模块是 maix.peripheral.gpio，扁平模块是 maix.gpio
+        #   -> 扁平形式 maix.gpio.GPIO.get_mode
+        # 简化规则：把第二段（子包名）去掉即可，因为它正是被再导出的那一层。
+        out.add(".".join([parts[0], *parts[2:]]))
+    return out
+
+
+def check_roster_covers_corpus(roster: set[str], raw_repo: Path) -> list[str]:
+    """自检：白名单是否覆盖语料里**实际出现**的 import 写法。
+
+    **这道检查来自一次真实事故**：白名单最初只收 API 文档的模块路径，
+    而文档路径（`maix.peripheral.gpio`）与教程里的 import 写法（`from maix import gpio`）
+    并不一致，导致校验器把正确代码判成幻觉。
+
+    所以每次构建都从教程原文里抽出 `from maix import X`，
+    报告哪些 X 不在白名单覆盖范围内。**这是让"白名单漏了什么"变得可见的手段。**
+    """
+    import re
+
+    from_re = re.compile(r"^\s*from\s+maix\.([\w.]+)\s+import\s+([^\n#]+)",
+                         re.MULTILINE)
+    top_re = re.compile(r"^\s*from\s+maix\s+import\s+([^\n#]+)", re.MULTILINE)
+
+    covered_flat = {n.split(".")[1] for n in roster
+                    if n.startswith("maix.") and len(n.split(".")) > 2}
+    missing: set[str] = set()
+
+    for md in raw_repo.rglob("*.md"):
+        try:
+            text = md.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        for m in from_re.finditer(text):
+            # from maix.peripheral.gpio import GPIO -> 需要 maix.peripheral.gpio 或它的扁平形式
+            sub = m.group(1)
+            if not any(n.startswith(f"maix.{sub}") for n in roster):
+                missing.add(f"from maix.{sub} import ...（{md.name}）")
+        for m in top_re.finditer(text):
+            for raw in m.group(1).split(","):
+                name = raw.strip().split(" as ")[-1].strip()
+                if not name or name in ("*",):
+                    continue
+                # from maix import gpio -> 需要白名单里有 maix.gpio.*
+                if name not in covered_flat and \
+                        not any(n.startswith(f"maix.{name}") for n in roster):
+                    missing.add(f"from maix import {name}（{md.name}）")
+    return sorted(missing)
+
+
+def discover_modules_from_corpus(raw_repo: Path) -> set[str]:
+    """从教程原文里抽出 `from maix import X` 的 X，作为已知模块补进白名单。
+
+    这一步是**语料自身在给白名单补漏**：API 文档页不全时，
+    教程里的实际用法是最好的证据来源。
+    """
+    import re
+
+    top = re.compile(r"^\s*from\s+maix\s+import\s+([^\n#]+)", re.MULTILINE)
+    sub = re.compile(r"^\s*from\s+maix\.([\w.]+)\s+import", re.MULTILINE)
+    found: set[str] = set()
+    if not raw_repo.exists():
+        return found
+    for md in raw_repo.rglob("*.md"):
+        try:
+            text = md.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        for m in top.finditer(text):
+            for raw in m.group(1).split(","):
+                name = raw.strip().split(" as ")[-1].strip()
+                # 只收单段模块名（含点的多半是类，不是模块）
+                if name and "*" not in name and "." not in name:
+                    found.add(f"maix.{name}")
+        for m in sub.finditer(text):
+            found.add(f"maix.{m.group(1)}")
+    return found
 
 
 def _write_jsonl(path: Path, rows) -> None:

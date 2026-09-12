@@ -44,8 +44,10 @@ from .registry import (
     ServiceCollision,
     ServiceMissing,
 )
+from .tools import Capability, Tool, ToolCall, ToolParam, ToolRegistry, ToolResult
 
 __all__ = [
+    "Capability",
     "Context",
     "Mounted",
     "Plugin",
@@ -55,5 +57,10 @@ __all__ = [
     "ServiceAlreadyProvided",
     "ServiceCollision",
     "ServiceMissing",
+    "Tool",
+    "ToolCall",
+    "ToolParam",
+    "ToolRegistry",
+    "ToolResult",
 ]
 

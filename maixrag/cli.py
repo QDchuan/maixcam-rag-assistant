@@ -213,6 +213,191 @@ def cmd_ablate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _build_main_branch_agent(cfg, args, bundle=None):
+    """装配主分支的 agent（工具 + 提示词 + 循环 + 沙盒）。"""
+    from .agent.app import build_agent
+    from .agent.loop import Budget
+    from .agent.models import JsonProtocolModel
+    from .agent.sandbox import SandboxPolicy
+    from .builders import build_indexes, make_retriever
+    from .providers import make_chat
+
+    if bundle is None:
+        bundle = build_indexes(cfg, fake_models=getattr(args, "fake_embed", False))
+
+    retriever = None
+    if cfg.retrieval.mode == "retrieve":
+        retriever = make_retriever(cfg, bundle)
+
+    if getattr(args, "fake_chat", False):
+        from .agent.loop import Decision, Message
+        from .providers import FakeChat
+
+        class _SimpleFake:
+            """假的"决策模型"：先检索一次，再据结果作答。
+
+            它让主分支能在**无网络、无密钥**下跑通全流程——
+            这是教学项目的硬性要求，也是让读者能先看到流程、
+            再去配真实模型的前提。
+            """
+
+            name = "fake-decider"
+
+            def __init__(self):
+                self.turn = 0
+
+            def decide(self, messages, tools):
+                self.turn += 1
+                if self.turn == 1:
+                    last_user = next(
+                        (m.content for m in reversed(messages) if m.role == "user"),
+                        "",
+                    )
+                    return Decision.call("search_docs", {"query": last_user[:60]})
+                tool_msgs = [m for m in messages if m.role == "tool"]
+                body = tool_msgs[-1].content[:400] if tool_msgs else "（无资料）"
+                return Decision.final(f"根据检索到的资料：\n{body}\n\n[1]")
+
+        model = _SimpleFake()
+    else:
+        chat = make_chat(cfg, cache_dir=cfg.indexes_dir / "cache")
+        model = JsonProtocolModel(chat=chat)
+
+    policy = SandboxPolicy.workspace_only(Path.cwd())
+
+    # 预算：命令行优先，其次配置，最后给一个保守默认。
+    #
+    # **实测发现 4 轮对这个语料的多跳问题不够**：agent 会先检索、再改写查询、
+    # 再切到确定性工具、再带着新学到的类名回去检索——四步都很合理，
+    # 但第四步就撞墙了。所以预算要匹配**任务深度**，不是越小越好。
+    max_turns = getattr(args, "max_turns", 0) or (
+        cfg.agent.max_turns if cfg.agent.enabled else 4
+    )
+    max_tools = getattr(args, "max_tool_calls", 0) or max(6, max_turns + 2)
+    budget = Budget(max_turns=max_turns, max_tool_calls=max_tools)
+    return build_agent(
+        cfg, chunks=bundle.chunks, symbols=bundle.symbols, roster=bundle.roster,
+        retriever=retriever, model=model, policy=policy, budget=budget,
+    )
+
+
+def cmd_agent(args: argparse.Namespace) -> int:
+    """跑一次主分支的 agent，并把轨迹打出来。
+
+    **轨迹在这里是主角，不是附属品。** 读者要看的不只是答案，
+    而是"它先查了什么、为什么改主意、最后依据哪几段"——
+    那才是 agent 与链的区别所在。
+    """
+    cfg = Config.load(args.config, project_root=Path.cwd())
+    _print_header("主分支 agent")
+    app = _build_main_branch_agent(cfg, args)
+
+    print(app.describe())
+    print()
+    print("─" * 72)
+    print(f"问题：{args.question}")
+    print("─" * 72)
+
+    from .agent.app import AgentProfile
+
+    profile = AgentProfile(app=app)
+    ans = profile.answer(args.question)
+    result = profile.last_result
+
+    print()
+    print("【执行轨迹】")
+    if result is not None:
+        for ev in result.events:
+            print(f"  第{ev.turn}轮 [{ev.kind}] {ev.detail[:110]}")
+        print(f"  结束原因：{result.stopped_reason}   消耗：{result.budget}")
+    else:
+        print("  （无轨迹）")
+
+    print()
+    print("【答案】")
+    print(ans.text)
+    if ans.refused:
+        print(f"\n[已拒答] {ans.refusal_reason}")
+    if ans.citations:
+        print("\n【依据】")
+        for c in ans.citations:
+            print(f"  [{c.index}] {c.doc_id}  {' / '.join(c.heading_path)}")
+    if args.show_hits and ans.hits:
+        print(f"\n【召回的片段】共 {len(ans.hits)} 个")
+        for i, h in enumerate(ans.hits, 1):
+            print(f"  [{i}] {h.chunk.doc_id} ({h.chunk.kind}) score={h.score:.3f}")
+    return 0
+
+
+def cmd_agent_eval(args: argparse.Namespace) -> int:
+    """用**同一把尺子**量主分支。
+
+    这是全项目最关键的一次对比：链式（L1）与 agent 循环，
+    在同一个评测集、同一套指标下谁更好。
+    如果 agent 有自己的评测方式，两条路线就无法比较。
+    """
+    from .agent.app import AgentProfile, agent_stats
+    from .builders import build_indexes
+    from .evaluation import load_dataset, run_eval
+
+    cfg = Config.load(args.config, project_root=Path.cwd())
+    _print_header("主分支 agent 评测")
+    bundle = build_indexes(cfg, fake_models=args.fake_embed)
+    app = _build_main_branch_agent(cfg, args, bundle=bundle)
+    profile = AgentProfile(app=app)
+
+    dataset = Path(args.dataset) if args.dataset else cfg.resolve(cfg.eval.dataset)
+    items = load_dataset(dataset)
+    if args.limit:
+        items = items[: args.limit]
+
+    notes = ["这是 agent 循环（多轮工具调用），与链式基线的数字可直接对比。"]
+    if args.fake_chat:
+        notes.append("决策用的是假模型：只验证流程，不代表真实表现。")
+
+    print(f"题目 {len(items)} 道，来自 {dataset}")
+    report = run_eval(profile, items, bundle.roster, k=args.top_k,
+                      config_snapshot=cfg.to_dict(), notes=notes)
+    print()
+    print(report.to_markdown())
+
+    print()
+    print("【agent 专属指标】（这些是链式基线没有的成本项）")
+    stats = agent_stats(app)
+    print(f"  工具调用总数  {stats['tool_calls']}")
+    print(f"  其中失败      {stats['tool_failures']}")
+    print(f"  其中被拒      {stats['denied']}")
+    print(f"  按工具分布    {stats['by_tool']}")
+    print(f"  平均每题工具调用  {_avg_tool_calls(report, app)}")
+    print()
+    print("  为什么这些指标必须一起看：一个问题如果链式一次检索就够，")
+    print("  而 agent 用了 4 轮 6 次调用，那多出来的成本就必须由")
+    print("  「答得更好」来偿还——否则 agent 就是纯粹的浪费。")
+
+    out = cfg.resolve("eval/results")
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "agent_loop.md").write_text(report.to_markdown(), encoding="utf-8")
+    (out / "agent_loop.json").write_text(
+        json.dumps({**report.to_json(), "agent_stats": stats},
+                   ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    print(f"\n报告已写入 {out / 'agent_loop.md'}")
+    return 0
+
+
+def _avg_tool_calls(report, app) -> str:
+    """平均每题的**工具调用数**（不是轮次）。
+
+    **必须读累计计数，不能读 `tools.history`**——单题评测时 history 会被
+    逐题清空，从它读会把"18 题的统计"变成"最后一题的统计"。
+    这个 bug 出现过两次（一次在 agent_stats，一次在这里），
+    所以口径与数据来源都写在文档字符串里。
+    """
+    n = len(report.items) or 1
+    return f"{app.total_tool_calls / n:.1f} 次/题"
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="maixrag",
@@ -273,6 +458,29 @@ def build_parser() -> argparse.ArgumentParser:
     ab.add_argument("--fake-embed", action="store_true")
     ab.add_argument("--fake-chat", action="store_true")
     ab.set_defaults(func=cmd_ablate)
+
+    # ---- 主分支（自己仿写的 agent）----
+    ag = sub.add_parser("agent", help="跑一次主分支 agent，并打印轨迹")
+    ag.add_argument("question")
+    ag.add_argument("--show-hits", action="store_true", help="展示召回的片段")
+    ag.add_argument("--max-turns", type=int, default=0,
+                    help="轮次预算（默认 4；多跳问题需要更大）")
+    ag.add_argument("--max-tool-calls", type=int, default=0,
+                    help="工具调用预算（默认 max(6, 轮次+2)）")
+    ag.add_argument("--fake-embed", action="store_true")
+    ag.add_argument("--fake-chat", action="store_true",
+                    help="用假的决策模型，完全不联网")
+    ag.set_defaults(func=cmd_agent)
+
+    ae = sub.add_parser("agent-eval", help="用同一把尺子量主分支 agent")
+    ae.add_argument("--dataset", default=None)
+    ae.add_argument("--top-k", type=int, default=5)
+    ae.add_argument("--limit", type=int, default=0)
+    ae.add_argument("--max-turns", type=int, default=0)
+    ae.add_argument("--max-tool-calls", type=int, default=0)
+    ae.add_argument("--fake-embed", action="store_true")
+    ae.add_argument("--fake-chat", action="store_true")
+    ae.set_defaults(func=cmd_agent_eval)
     return p
 
 
