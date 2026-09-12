@@ -1,0 +1,35 @@
+# 语料原始快照与派生产物都不入库——它们都能由脚本重新生成
+corpus/raw/
+corpus/processed/
+indexes/
+
+# 但**这两样要入库**，因为它们是"可复现"的凭据而不是产物：
+#   manifest.json  记录上游 commit + 每个文件的 sha256 → 凭它就能复现出同一份语料
+#   reports/       语料统计与差异报告 → 是后续一切对比的基准
+!corpus/manifest.json
+!corpus/reports/
+
+# 评测产物：报告与数据集入库，缓存不入库
+eval/results/cache/
+eval/results/*.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# 密钥：只从环境变量读，任何情况都不入库
+.env
+.env.*
+!.env.example
+*.key
+
+# 编辑器与系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,34 @@
+# L0：无 RAG 基线。
+#
+# 不给任何资料，直接问模型。它存在的唯一目的是建立"差"的参照——
+# 没有它，后面所有改善都失去刻度。
+#
+# 用法：maixrag eval --config configs/l0_no_rag.yaml --level no_rag --fake
+
+corpus:
+  version: "main"
+  sources: [repo, api]
+  pin: true
+  repo_mode: archive
+
+chunking:
+  strategy: heading
+  max_tokens: 500
+  min_tokens: 80
+  overlap_tokens: 80
+  contextual_header: false
+
+retrieval:
+  mode: none
+  retrievers: []
+  fusion: rrf
+  top_k: 5
+
+generation:
+  model: "${CHAT_MODEL}"
+  base_url: "${CHAT_BASE_URL}"
+  api_key: "${CHAT_API_KEY}"
+  context_strategy: full_corpus
+
+agent:
+  enabled: false

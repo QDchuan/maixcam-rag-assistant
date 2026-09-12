@@ -1,0 +1,1244 @@
+{
+  "schema": 1,
+  "version": "main",
+  "commit": "",
+  "fetched_at": "2026-09-12T07:02:57+00:00",
+  "sources": [
+    "repo",
+    "api"
+  ],
+  "pinned": false,
+  "api_fetched_at": "",
+  "notes": [
+    "由 adopt 从磁盘重建（未校验上游版本）",
+    "zh: adopt 119 个文件",
+    "api: adopt 56 个文件"
+  ],
+  "files": [
+    {
+      "rel_path": "ai_model_converter/ai_model_deploy.md",
+      "doc_id": "zh/ai_model_converter/ai_model_deploy",
+      "sha256": "19dbba27076d6f20ef4d2e4113398121ba6f31c14bdaf0f7ea337d2b350cb90a",
+      "bytes": 5201,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "ai_model_converter/maixcam.md",
+      "doc_id": "zh/ai_model_converter/maixcam",
+      "sha256": "5e9732cac2808338cb7db03680d876bfaf91d05258cd88a03290e4476391ad5d",
+      "bytes": 15207,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "ai_model_converter/maixcam2.md",
+      "doc_id": "zh/ai_model_converter/maixcam2",
+      "sha256": "eadbee382a34799f334f530197d583119fa381d0c935f126315db8f78c376604",
+      "bytes": 17940,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "ai_model_converter/online_converter.md",
+      "doc_id": "zh/ai_model_converter/online_converter",
+      "sha256": "215c36ad812fd21d6ac2b9e1a51dae54edc970345096287bb2dccee785aac786",
+      "bytes": 4323,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "ai_model_converter/onnx_export.md",
+      "doc_id": "zh/ai_model_converter/onnx_export",
+      "sha256": "e853e15d393d635f9fc506ca5aad31578aacf8252f58b022cf4c98a952aa5ace",
+      "bytes": 2404,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "ai_model_converter/web_converter.md",
+      "doc_id": "zh/ai_model_converter/web_converter",
+      "sha256": "1c7c12968a773bc5934b71aa074e486af91f5799a0eefe88052e15655a398828",
+      "bytes": 11163,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "audio/ai_classify.md",
+      "doc_id": "zh/audio/ai_classify",
+      "sha256": "14e1bf4b90a9b23784f588e5eb0b6558f93767ec4adf951467fc46ce130f826f",
+      "bytes": 574,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "audio/deploy_online_recognition.md",
+      "doc_id": "zh/audio/deploy_online_recognition",
+      "sha256": "a5a0d1beb040ad67be0810ae7da25a080ec894b93c618137a02212f2e64e508b",
+      "bytes": 6305,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "audio/digit.md",
+      "doc_id": "zh/audio/digit",
+      "sha256": "aee3860be4de47c1ec54162bd11d786422fe9a63254fc7e352615088adbba8ac",
+      "bytes": 3722,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "audio/keyword.md",
+      "doc_id": "zh/audio/keyword",
+      "sha256": "5ff91f334e01a57a3030c4df61d5c0cb30d031498c6d34011eac7eb65291768f",
+      "bytes": 4962,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "audio/play.md",
+      "doc_id": "zh/audio/play",
+      "sha256": "2a5fa7c6effee76348af76c8ba9fa522b7f69e43c075391bc24934401b26cab3",
+      "bytes": 6578,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "audio/recognize.md",
+      "doc_id": "zh/audio/recognize",
+      "sha256": "b9040529a77beb2b9a7ef37c78fed36e35f764ae08b134f67bff1b1956941963",
+      "bytes": 4975,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "audio/record.md",
+      "doc_id": "zh/audio/record",
+      "sha256": "f4aaca47f2f1c52b2526609648b438a1d4ae017cfe8b7601d3fb6aa5e397121f",
+      "bytes": 4149,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "audio/synthesis.md",
+      "doc_id": "zh/audio/synthesis",
+      "sha256": "38ddfdc176c3b5de55ed21c533e88217141c2c899c8177a4f61fb34f9cf946e3",
+      "bytes": 763,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "basic/app.md",
+      "doc_id": "zh/basic/app",
+      "sha256": "0adc1fe2aec8de4730baca51fddc97eba9cfe8897f6f1c2caf08db4248adec9d",
+      "bytes": 6861,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "basic/app_usage.md",
+      "doc_id": "zh/basic/app_usage",
+      "sha256": "dc1399707857803296e2100a898e6cac4dbb6e07be5674736a2dfaefaf23669d",
+      "bytes": 98,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "basic/auto_start.md",
+      "doc_id": "zh/basic/auto_start",
+      "sha256": "a863b4a40757a2269b4466d3d3866e40d1df798ce790955c5cd2de414393eaee",
+      "bytes": 4145,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "basic/linux_basic.md",
+      "doc_id": "zh/basic/linux_basic",
+      "sha256": "cc4defeb062958442767077926885f3da5691aedffb87dc1149a428920ebcf69",
+      "bytes": 16795,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "basic/maixpy_upgrade.md",
+      "doc_id": "zh/basic/maixpy_upgrade",
+      "sha256": "2b0a13fcc38748ce87400b29bcc82b6d68738be462f5e07d4cb393f6ed723dfa",
+      "bytes": 83,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "basic/maixvision.md",
+      "doc_id": "zh/basic/maixvision",
+      "sha256": "e78596b299b6304f11f0080fdcf435a539cabc4d5bcda216dafb841c243f7795",
+      "bytes": 8996,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "basic/os.md",
+      "doc_id": "zh/basic/os",
+      "sha256": "e24f8f10f51e8d4b5806d01a3e87ceacefa315588c60460c1800e00c900c2d06",
+      "bytes": 98,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "basic/picoclaw.md",
+      "doc_id": "zh/basic/picoclaw",
+      "sha256": "b66d301d2740175df5bd52beb0bf31069e099cc48d6dd04de61a4b37c40aea20",
+      "bytes": 4375,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "basic/python.md",
+      "doc_id": "zh/basic/python",
+      "sha256": "1f984cab317f6be33baa82d754a2dfaab5b52988ec83dcc4afaad1b9d9aa7c2a",
+      "bytes": 4030,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "basic/python_pkgs.md",
+      "doc_id": "zh/basic/python_pkgs",
+      "sha256": "055ce59cbad7c26a32caee01fdccf1b56cf34f465080a0badc60acc8ab9471bb",
+      "bytes": 2976,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "basic/upgrade.md",
+      "doc_id": "zh/basic/upgrade",
+      "sha256": "7dfed35e88b3733edeb77626f82c5155a5ccc986c3fcffed3bdc2a5735735eeb",
+      "bytes": 7936,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "basic/view_src_code.md",
+      "doc_id": "zh/basic/view_src_code",
+      "sha256": "eca68fb9d29eca63a4be87ecf052bdca3238acdbf7b2088eb4efdbfb729eb26a",
+      "bytes": 5168,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "comm/maix_protocol.md",
+      "doc_id": "zh/comm/maix_protocol",
+      "sha256": "f4b6f705c116ca1f95db48b186806bf65617c09fa0d8a65b840fc44ae6a15fa5",
+      "bytes": 7356,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "comm/modbus.md",
+      "doc_id": "zh/comm/modbus",
+      "sha256": "cafc1823c1aec87b2531c10fc67a3935132c46bbe65918c8042a7829fe45aec8",
+      "bytes": 7022,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "faq.md",
+      "doc_id": "zh/faq",
+      "sha256": "c916bcee003b9ce165411c6449a087264a3c4c324df472c563c4817ce1283810",
+      "bytes": 22106,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "gui/i18n.md",
+      "doc_id": "zh/gui/i18n",
+      "sha256": "e6cb5b75d331b98d75d3777e9b79fe045ef9d3780d91f9bf67c62373d949b2cc",
+      "bytes": 5903,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "kit/microscope.md",
+      "doc_id": "zh/kit/microscope",
+      "sha256": "573c4edfccc95e631b2fc989c4325f262b0a93ff672cd4a8d1adbbfd3cdfe6c5",
+      "bytes": 1179,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "mllm/asr_sensevoice.md",
+      "doc_id": "zh/mllm/asr_sensevoice",
+      "sha256": "9427d59a47e12c7b3a887950253210668030f4617cf2fc6ea5d65db74ae4cf1a",
+      "bytes": 3433,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "mllm/asr_whisper.md",
+      "doc_id": "zh/mllm/asr_whisper",
+      "sha256": "81d677da06d0f9a335605409182e30cb1dd7594260729322fbd9314de9615ac4",
+      "bytes": 1232,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "mllm/basic.md",
+      "doc_id": "zh/mllm/basic",
+      "sha256": "be15824911e0c05b492c8305e7aced48866d18d603eca0e513abeaf361540de0",
+      "bytes": 6440,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "mllm/dlm_lora_sdv1_5.md",
+      "doc_id": "zh/mllm/dlm_lora_sdv1_5",
+      "sha256": "adbef83906ee860563f4c80c915be86c1e4e25cbc86cd252c50f982b22a28483",
+      "bytes": 4469,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "mllm/llm_deepseek.md",
+      "doc_id": "zh/mllm/llm_deepseek",
+      "sha256": "a18c31e9adb4ee6762c72686905b340b5a331e9ee07947471755c8f4c9fbee73",
+      "bytes": 6307,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "mllm/llm_qwen.md",
+      "doc_id": "zh/mllm/llm_qwen",
+      "sha256": "0e8afd8fa7e6ee0066099f4e057390701b250ad9fd3a577af339ea861e6dbf22",
+      "bytes": 8024,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "mllm/tts_melotts.md",
+      "doc_id": "zh/mllm/tts_melotts",
+      "sha256": "44354ab43e660b4cf4045dccc770f7ce749371206cee10c9872c984add582b42",
+      "bytes": 2489,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "mllm/vlm_internvl.md",
+      "doc_id": "zh/mllm/vlm_internvl",
+      "sha256": "edb37791d7a6575797e44cc4dde600a87c7f615d76bc51f43d9b061ded49b098",
+      "bytes": 5869,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "mllm/vlm_qwen3.md",
+      "doc_id": "zh/mllm/vlm_qwen3",
+      "sha256": "9cf22f8dd948b88f2384bad7b992e5b8ef9c1bbdb503ed8c6d3eb9f76d174258",
+      "bytes": 8730,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "mllm/vlm_smolvlm.md",
+      "doc_id": "zh/mllm/vlm_smolvlm",
+      "sha256": "b2144ccb4041511c3a171f3ce04bbbc73bca162709f37ca0de0f4c3b186e4ec9",
+      "bytes": 4124,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "modules/ahrs.md",
+      "doc_id": "zh/modules/ahrs",
+      "sha256": "488672a1962d1d23850fe08ed93a3377945a606cd5334bdc23155d437f102c1f",
+      "bytes": 9268,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "modules/bluetooth.md",
+      "doc_id": "zh/modules/bluetooth",
+      "sha256": "12da4b5c4f67ddac4a1d4f5415af5473aa3510dd80b9a850ca568cb9cfe14fdd",
+      "bytes": 3840,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "modules/fp5510.md",
+      "doc_id": "zh/modules/fp5510",
+      "sha256": "1ae10ce5673c48541c644a81e7e8eb25597b9b4b55ec402ac9bfb2d3e6cbdfe3",
+      "bytes": 1291,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "modules/pmu.md",
+      "doc_id": "zh/modules/pmu",
+      "sha256": "5d878e97a9badbd1c37c833be0736975b6ab1e4bedce97de0002803b3774f31e",
+      "bytes": 3342,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "modules/rtc.md",
+      "doc_id": "zh/modules/rtc",
+      "sha256": "0de29e7ad898b1fa287b57b4ae59a47ef257816c1e3cdff161a045b938650840",
+      "bytes": 518,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "modules/spilcd.md",
+      "doc_id": "zh/modules/spilcd",
+      "sha256": "fee16bfa8cdf8610cc2b0842a67a502272ab29481fc03336341c693dd56d748c",
+      "bytes": 6262,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "modules/temp_humi.md",
+      "doc_id": "zh/modules/temp_humi",
+      "sha256": "1996e25f616276d64ff1cd750573b917df9e86da7c94319d299ca04fb6c4d834",
+      "bytes": 741,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "modules/thermal_cam.md",
+      "doc_id": "zh/modules/thermal_cam",
+      "sha256": "5afc9a1da0c4e61a2b2c150a609fdae8e3d15d49471d2bb2897e85aec60372b5",
+      "bytes": 1194,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "modules/tmc2209.md",
+      "doc_id": "zh/modules/tmc2209",
+      "sha256": "57a4e64bad5df1fe315f18bb5e67c2d35a27b73afe67f7579187d50d0645517a",
+      "bytes": 12973,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "modules/tof.md",
+      "doc_id": "zh/modules/tof",
+      "sha256": "4cc66de265b5defe2aabf0f04ebd551c3afd4b1431d255d2f03f3db3a81c9814",
+      "bytes": 1287,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "network/flask.md",
+      "doc_id": "zh/network/flask",
+      "sha256": "2c226d9c48e49ba15bc5d2d70b9b36db8c98f43256ffb0cde8cbe27657f3a235",
+      "bytes": 1504,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "network/http.md",
+      "doc_id": "zh/network/http",
+      "sha256": "31036763bb91af796ccb4876e10f7d95b8e4b190ccf225f4b00696bf5e85eaa0",
+      "bytes": 997,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "network/mqtt.md",
+      "doc_id": "zh/network/mqtt",
+      "sha256": "22acbe4e0f712f1a9742e3cfddb180d33a7c1f0a75ffb0b7ea297e0fff643bc1",
+      "bytes": 1208,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "network/network_settings.md",
+      "doc_id": "zh/network/network_settings",
+      "sha256": "a7d70f6fcbdc579d9b53f40d705b018a9e2b37506282fd663e15efac4dc9db8e",
+      "bytes": 1520,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "network/socket.md",
+      "doc_id": "zh/network/socket",
+      "sha256": "07e7762a1bbca54012203690083c6c4c7893c32340113cfc548301e77fa0097c",
+      "bytes": 3415,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "network/websocket.md",
+      "doc_id": "zh/network/websocket",
+      "sha256": "2ea986a4422511e57dd03de696f385508e4b46486f8186813cf79214369508c1",
+      "bytes": 2092,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "peripheral/adc.md",
+      "doc_id": "zh/peripheral/adc",
+      "sha256": "70cbfbfc5474cc0e6d7436d4c1782a2be0a4194089bc0182fedee987b05250e0",
+      "bytes": 4704,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "peripheral/gpio.md",
+      "doc_id": "zh/peripheral/gpio",
+      "sha256": "959f62e8afb33e659f03c159a732c76700cdbbbd9f987ed5efd015167fe7c0ae",
+      "bytes": 4648,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "peripheral/hid.md",
+      "doc_id": "zh/peripheral/hid",
+      "sha256": "e3104b1ddcfe14dbcfb21304ce7e40708dcc0023e2273cf1e57d7fda0cf96711",
+      "bytes": 5475,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "peripheral/i2c.md",
+      "doc_id": "zh/peripheral/i2c",
+      "sha256": "23ecd311d2a496373325f5e909f7edba2ba645115bba2b62323f8c1e7bb6e931",
+      "bytes": 3986,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "peripheral/key.md",
+      "doc_id": "zh/peripheral/key",
+      "sha256": "58472db6c6bba5035a683ac613e114627870527ba8010d4f822c01c65e429365",
+      "bytes": 3073,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "peripheral/pinmap.md",
+      "doc_id": "zh/peripheral/pinmap",
+      "sha256": "84c6f24684ba59210cc209680875b3c9a517db48f7f2b545d16bcba42846a3e1",
+      "bytes": 9340,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "peripheral/pwm.md",
+      "doc_id": "zh/peripheral/pwm",
+      "sha256": "831962b69641bd069ff2b3f52eb9be89d0b3440f5951f00ca8b6bfbc4398727d",
+      "bytes": 3921,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "peripheral/spi.md",
+      "doc_id": "zh/peripheral/spi",
+      "sha256": "fbc6ccc2b0a4179beac46b71cf2e3cf3026982e119d0a3df52add26cf22bef32",
+      "bytes": 6407,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "peripheral/uart.md",
+      "doc_id": "zh/peripheral/uart",
+      "sha256": "ffafdcb870e70c96652ab09ffc35ccaf970ef19b1c10d417aaa1caea292c9b86",
+      "bytes": 29906,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "peripheral/wdt.md",
+      "doc_id": "zh/peripheral/wdt",
+      "sha256": "c3a3796b6dfb64e0abe7dd1d3e0f39527b6d88341a78bfe3d5cbfd2fa1cf0bd5",
+      "bytes": 685,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "pro/compile_os.md",
+      "doc_id": "zh/pro/compile_os",
+      "sha256": "ad38c97a6707469da860c5df7a47d8d740f98c9febc2496d2a83c99b581cf482",
+      "bytes": 3603,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "pro/customize_model.md",
+      "doc_id": "zh/pro/customize_model",
+      "sha256": "43f70bf0e28113ff2176c8124986f06a6d07fe86044612333aefaf907b01018b",
+      "bytes": 9906,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "pro/datasets.md",
+      "doc_id": "zh/pro/datasets",
+      "sha256": "d09dd1f6f9518cd54f26f49b0fbbb0e24bf4726ac05ff9b0dcdfa97aaae0930a",
+      "bytes": 6103,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "pro/memory.md",
+      "doc_id": "zh/pro/memory",
+      "sha256": "dc1279519b91f6c98b2f68e5ca3789b48053d061201a98b7e738ab04c5d42413",
+      "bytes": 4603,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "projects/face_tracking.md",
+      "doc_id": "zh/projects/face_tracking",
+      "sha256": "fd1b6e82c0f0c079a6aab722e443bfe3a60af719e8d97f8458d96f05964e177b",
+      "bytes": 4169,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "projects/line_tracking_robot.md",
+      "doc_id": "zh/projects/line_tracking_robot",
+      "sha256": "1328f389041bd49e1dd8d6c84c76e05b4396e18c4b0a96dd0478012c5a47c484",
+      "bytes": 2354,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "projects/README.md",
+      "doc_id": "zh/projects/README",
+      "sha256": "d97ad0f85c0c57d2471c3a512211663bb7d448043d7671fee56875da0d5e1ee0",
+      "bytes": 11388,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "README.md",
+      "doc_id": "zh/README",
+      "sha256": "f05e2fa8ceacf4d9f61e89144b4a7655323a56c5434beabbb5a7b22266f0b2f3",
+      "bytes": 6542,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "README_MaixCAM.md",
+      "doc_id": "zh/README_MaixCAM",
+      "sha256": "823946634cf0c40eeec4d4cb558731cb10712ae1738acd58213b655f4fbf06ea",
+      "bytes": 10930,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "README_MaixCAM2.md",
+      "doc_id": "zh/README_MaixCAM2",
+      "sha256": "2a1bec1df4c665627cabd77cbe08c5d04d2b66ea67067401af6c6839cd6c844b",
+      "bytes": 10423,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "README_no_screen.md",
+      "doc_id": "zh/README_no_screen",
+      "sha256": "130f9e2494f73f9d361ccc5d4c0a22b67edb3053cc70e455cab57a490bc33022",
+      "bytes": 8773,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "source_code/add_c_module.md",
+      "doc_id": "zh/source_code/add_c_module",
+      "sha256": "f29d609964e47cb9caf3061d9c1face82fd6a1ab8930fb4c20117f771e414e13",
+      "bytes": 5383,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "source_code/build.md",
+      "doc_id": "zh/source_code/build",
+      "sha256": "dc4ef61471aecf20d8d484a499722a3479eb1c16d3cfb7fa06fe5c91f5dd39f5",
+      "bytes": 9141,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "source_code/contribute.md",
+      "doc_id": "zh/source_code/contribute",
+      "sha256": "0143b796a0c313074eff569c3cd51a967e653b8797b531a0d23045ac37c1158f",
+      "bytes": 2478,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "source_code/faq.md",
+      "doc_id": "zh/source_code/faq",
+      "sha256": "cca2d617cf42f9a847792a79545eee84efa04385352733ce0694fd419dbedd32",
+      "bytes": 1285,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "source_code/maixcdk.md",
+      "doc_id": "zh/source_code/maixcdk",
+      "sha256": "efecec3950872ba92a660e92cfddf64e2b5418541bb9fb7430c9990165470b57",
+      "bytes": 614,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "video/record.md",
+      "doc_id": "zh/video/record",
+      "sha256": "3490f4b80053a99060b2def08f44ee52c34d155f3dee11df018d88dee961ede4",
+      "bytes": 3837,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "video/rtmp_streaming.md",
+      "doc_id": "zh/video/rtmp_streaming",
+      "sha256": "73cac65b3dea0fa9e191188f5d0c195e3b32ab7ddf9f5edc1344bc631d71b96c",
+      "bytes": 4336,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "video/rtsp_streaming.md",
+      "doc_id": "zh/video/rtsp_streaming",
+      "sha256": "edf15ca10fb4177c71d5492f0d19ca9ceeb39a4fd6446fb2dcef9a3fc3171585",
+      "bytes": 2299,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "video/uvc_streaming.md",
+      "doc_id": "zh/video/uvc_streaming",
+      "sha256": "3886d6a17044db93320a782b9705ce411d2cbe8bb6980034665fc5573cc96d49",
+      "bytes": 4393,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "video/webrtc_streaming.md",
+      "doc_id": "zh/video/webrtc_streaming",
+      "sha256": "2fce6e86e7799d24f952e9103b6148d62891ae95e7ee66da6dd4159d281a3f97",
+      "bytes": 1595,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/ai.md",
+      "doc_id": "zh/vision/ai",
+      "sha256": "254c4c4bd5a33ba980d8ede90040f9171a834459abf00132c5309ab0d86dcf4c",
+      "bytes": 1163,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/apriltag.md",
+      "doc_id": "zh/vision/apriltag",
+      "sha256": "a007f6a811ad5c1e486bd7fc3b2afef5c384486c4ffbef3336bb86d6d9bceeba",
+      "bytes": 12529,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/body_key_points.md",
+      "doc_id": "zh/vision/body_key_points",
+      "sha256": "d1e170c40e85c920c84953b2981c3e7436c8aa503a3b9cf521ede740b9b94168",
+      "bytes": 3343,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/body_pose_classification.md",
+      "doc_id": "zh/vision/body_pose_classification",
+      "sha256": "e0ce3f5fa2205e56c653650c60bde89d26107b389a5b2963834a46d847033782",
+      "bytes": 1588,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/camera.md",
+      "doc_id": "zh/vision/camera",
+      "sha256": "e3fca6747de81ebe96a0e4244116153023ed793145d1792930c2526888beee96",
+      "bytes": 13130,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/classify.md",
+      "doc_id": "zh/vision/classify",
+      "sha256": "9cc446eaae8bf719f78d9a6594b0f39c626697a4d79ba6e9085ba83937448fff",
+      "bytes": 2768,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/customize_model_yolo.md",
+      "doc_id": "zh/vision/customize_model_yolo",
+      "sha256": "20cfd72f039f7ee52fdb66bc499b6ca400faea7814e211e1944ecbb9281c296a",
+      "bytes": 5545,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/depth_anything.md",
+      "doc_id": "zh/vision/depth_anything",
+      "sha256": "694c0541689e160938a63ccff20a081b7fa4cf7667bc84d89478a14e9cb55209",
+      "bytes": 3149,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/detect_obb.md",
+      "doc_id": "zh/vision/detect_obb",
+      "sha256": "0326093f5432ac60433943da8ff1c7ebaa9d04db5d9803b407a7e28341122e3a",
+      "bytes": 3374,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/display.md",
+      "doc_id": "zh/vision/display",
+      "sha256": "dc6e8568521e73991fcebdfc6ce859aa52965a4afcdcc242a9272ed52fcb54f0",
+      "bytes": 5971,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/face_detection.md",
+      "doc_id": "zh/vision/face_detection",
+      "sha256": "c72c499944d53bc4e7e9f826715d149478e7517dc79d04339b1d89c2a84450a6",
+      "bytes": 3299,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/face_emotion.md",
+      "doc_id": "zh/vision/face_emotion",
+      "sha256": "8ae09f237d39ef876441f224f11c0f257f0e9f57cd9cdc847f1b4d6f8720af51",
+      "bytes": 7756,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/face_landmarks.md",
+      "doc_id": "zh/vision/face_landmarks",
+      "sha256": "8c11e1e44d206d56d818cc8030ae57284346256b1de881dd1bdef63b3e561dde",
+      "bytes": 4840,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/face_recognition.md",
+      "doc_id": "zh/vision/face_recognition",
+      "sha256": "8acc936595d457f21e7d391d7523df218172a1f432c4b1a9116ee4c0c26adff1",
+      "bytes": 4468,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/find_barcodes.md",
+      "doc_id": "zh/vision/find_barcodes",
+      "sha256": "3fb123b462ab501deb44bdde8c2d5bc525441fc76cf25f70b5c85defca7db195",
+      "bytes": 3411,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/find_blobs.md",
+      "doc_id": "zh/vision/find_blobs",
+      "sha256": "3f694aa664a9782ca8a7da38617d6d5df9b55f88d924673211053a3caf54e3f9",
+      "bytes": 9608,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/hand_gesture_classification.md",
+      "doc_id": "zh/vision/hand_gesture_classification",
+      "sha256": "21079a938fcda62d73fe0f88e89d8773dec167d882efb9937a2e8687c978e34d",
+      "bytes": 11451,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/hand_landmarks.md",
+      "doc_id": "zh/vision/hand_landmarks",
+      "sha256": "2a352aca37a6bdc37134366ca95e298e1c264edd50dfaeddbd715f52a1661c47",
+      "bytes": 7370,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/image_ops.md",
+      "doc_id": "zh/vision/image_ops",
+      "sha256": "c35898a227cf4d6b829e0f53434843799c5dff9fe38522828a0b4a8ed59ddcd4",
+      "bytes": 11017,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/line_tracking.md",
+      "doc_id": "zh/vision/line_tracking",
+      "sha256": "487e1a6c59ddb02c204fcaf44e68d42e60648f900645d9b70ac6cc5ff43e6b07",
+      "bytes": 9088,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/maixhub_train.md",
+      "doc_id": "zh/vision/maixhub_train",
+      "sha256": "32388d1be6d365da28cece045906126eba6716be043b2868f984d4c81e0a3ab2",
+      "bytes": 4003,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/ocr.md",
+      "doc_id": "zh/vision/ocr",
+      "sha256": "dbc449db1f7b0de028d3cf60e08466f9afe89b8261b11e4c6f5a59cc438f0e65",
+      "bytes": 6873,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/opencv.md",
+      "doc_id": "zh/vision/opencv",
+      "sha256": "86b86e3e1ca36ae7edea1e273c1383ad3434aeb719196227b75f666d916dde29",
+      "bytes": 5539,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/qrcode.md",
+      "doc_id": "zh/vision/qrcode",
+      "sha256": "2521ba819f782799f8b191b39d6ce19981c58faf12fc8a115b0c5b57e803369e",
+      "bytes": 5746,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/segmentation.md",
+      "doc_id": "zh/vision/segmentation",
+      "sha256": "233e12915225667ec68f47e50ecf74f597c6eaf30e51a4f67024856bffd2b8e8",
+      "bytes": 2619,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/self_learn_classifier.md",
+      "doc_id": "zh/vision/self_learn_classifier",
+      "sha256": "420772921f7b1fe2712767d3ccb2edfdf9ac9abd406d78ee022630b981e6554d",
+      "bytes": 3438,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/self_learn_detector.md",
+      "doc_id": "zh/vision/self_learn_detector",
+      "sha256": "ccda776898e4a57a3da0746f51d5cdb91eee7609d847cc0ccf7316e9232a14e7",
+      "bytes": 5093,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/touchscreen.md",
+      "doc_id": "zh/vision/touchscreen",
+      "sha256": "4baee6f9ba4bab7a8e7b065d853ac6ca97735cf576eb03f7af560cc8f9d15fea",
+      "bytes": 4533,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/yolo26-depth.md",
+      "doc_id": "zh/vision/yolo26-depth",
+      "sha256": "d5d7c42dcb52f848de114314d3c08b807699607fa86cc9fd9a75fac61eef41a3",
+      "bytes": 11967,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/yolo_world.md",
+      "doc_id": "zh/vision/yolo_world",
+      "sha256": "6172c66df204a06df206b3c88722b12bb2541ab2b1a3c6a9c9db922bbe8e7888",
+      "bytes": 10774,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "vision/yolov5.md",
+      "doc_id": "zh/vision/yolov5",
+      "sha256": "a1478ec6090cc39c3d5dc5795415c86e0770287f56963b293baabb39dc296488",
+      "bytes": 5238,
+      "lang": "zh"
+    },
+    {
+      "rel_path": "camera.html",
+      "doc_id": "api/camera",
+      "sha256": "6e812111071c47c49ac80a07adea364203cd018b7b3561f55345617ce77a8fb7",
+      "bytes": 56530,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/ahrs.html",
+      "doc_id": "api/maix.ahrs",
+      "sha256": "5209a9b4a8d1e69317ca28cebb4be70fdd0dcc808ad504e1f2ee10f24cf4c0e9",
+      "bytes": 27901,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/app.html",
+      "doc_id": "api/maix.app",
+      "sha256": "865f9764adb158c70de1f2c6653f2db629e7bbaa65dd349bb40f2938af6b30ca",
+      "bytes": 43703,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/audio.html",
+      "doc_id": "api/maix.audio",
+      "sha256": "befbb6f7a8f457e36eaecd6f1e00c61d08fd4b10b19deec7e9d5c46453ebf2f6",
+      "bytes": 50865,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/camera.html",
+      "doc_id": "api/maix.camera",
+      "sha256": "6e812111071c47c49ac80a07adea364203cd018b7b3561f55345617ce77a8fb7",
+      "bytes": 56530,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/comm/modbus.html",
+      "doc_id": "api/maix.comm.modbus",
+      "sha256": "9d800e217caf1f8e39c7fd799677a2f8cdcbf8a70b9f29002c775477ec6b81e2",
+      "bytes": 63196,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/comm.html",
+      "doc_id": "api/maix.comm",
+      "sha256": "25290b564c76c134b3bce07ffdc4cab495435b73e336103a17995504543055c9",
+      "bytes": 29496,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/display.html",
+      "doc_id": "api/maix.display",
+      "sha256": "078943b3d206024308b029c0179089d80c19480c83418e041842f8dd1f1ac196",
+      "bytes": 38766,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/err.html",
+      "doc_id": "api/maix.err",
+      "sha256": "77cb59b8e0f756aeea60f820fbccbf90cc2ba9bff947bf8736086ef3dac8c138",
+      "bytes": 25442,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/example.html",
+      "doc_id": "api/maix.example",
+      "sha256": "82dcd0874500a082045cf649b04f0b2f8d0b8bc72368b018e8647020dc5a4cc2",
+      "bytes": 40852,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/ext_dev/axp2101.html",
+      "doc_id": "api/maix.ext_dev.axp2101",
+      "sha256": "4c102fcb0d93960738f090fb2732eae807091ee6c352eda2fd5c7dc843e04554",
+      "bytes": 44422,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/ext_dev/bm8563.html",
+      "doc_id": "api/maix.ext_dev.bm8563",
+      "sha256": "39cebf2a4d36524bcc6166995f6a79a54072c1f762677f3efe9ae79974c07480",
+      "bytes": 24321,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/ext_dev/cmap.html",
+      "doc_id": "api/maix.ext_dev.cmap",
+      "sha256": "a341d442440f4c0225721b79048548fd51a22e57f873a4198581292c161ce842",
+      "bytes": 19949,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/ext_dev/fp5510.html",
+      "doc_id": "api/maix.ext_dev.fp5510",
+      "sha256": "33ff708abb7dd2ec420b8a827fb09330c4805cae467564c7e4c7fe053940b5f9",
+      "bytes": 21517,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/ext_dev/imu.html",
+      "doc_id": "api/maix.ext_dev.imu",
+      "sha256": "9d29b382fe08f01ef7805ad9cdb37b19c20f187321094adee7003b04b93dcdb7",
+      "bytes": 48140,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/ext_dev/mlx90640.html",
+      "doc_id": "api/maix.ext_dev.mlx90640",
+      "sha256": "f2d2bfa4d2a52b80eccfc3632dc21d78096fa3154849c2c43afc3e1029d19327",
+      "bytes": 45621,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/ext_dev/pmu.html",
+      "doc_id": "api/maix.ext_dev.pmu",
+      "sha256": "cb3eee64d5f82c9894031f10e25ea89a17cdc7c58ee0386e9ecf7e6789849fe9",
+      "bytes": 30672,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/ext_dev/qmi8658.html",
+      "doc_id": "api/maix.ext_dev.qmi8658",
+      "sha256": "330464195a08a6addf59ce146809b7837720bdedf9e71284022b4f250a31e691",
+      "bytes": 22156,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/ext_dev/tmc2209.html",
+      "doc_id": "api/maix.ext_dev.tmc2209",
+      "sha256": "3007ebaeb06ff5f7d9dd3bc367ceef7ee70262816a9e81d014c7eee83d9472fa",
+      "bytes": 40332,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/ext_dev/tof100.html",
+      "doc_id": "api/maix.ext_dev.tof100",
+      "sha256": "a619451aa22c29689514dfd8efd90a42c79a661c30565956f9711a5c22022fb4",
+      "bytes": 29763,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/ext_dev.html",
+      "doc_id": "api/maix.ext_dev",
+      "sha256": "06b2fa3363154412ac1378732c46957bf64734eb0942c54280e97593021d2849",
+      "bytes": 20227,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/fs.html",
+      "doc_id": "api/maix.fs",
+      "sha256": "d8b8912f5b906d256896e1de9a28206fd67dce6c42d6c90c2e8e96942580a0b9",
+      "bytes": 44121,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/http.html",
+      "doc_id": "api/maix.http",
+      "sha256": "0d01ee26cf49056dd044d5620396465bde475a2b5904f7cbe87e393bcf9abb8c",
+      "bytes": 24550,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/i18n.html",
+      "doc_id": "api/maix.i18n",
+      "sha256": "052d5a347b0d7ec2fff611028473fc7f63dc520be940fdf4568e13a503dfc3e2",
+      "bytes": 28155,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/image.html",
+      "doc_id": "api/maix.image",
+      "sha256": "dcf0b277a984b42f7c4f7f9f97586a1473abfbac0634768a6b875487b9e86473",
+      "bytes": 373359,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/log.html",
+      "doc_id": "api/maix.log",
+      "sha256": "d9bd61635e71d84b9f887365b615d7bd121100fd51c1bf9abb5b23f27396f972",
+      "bytes": 21527,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/network/wifi.html",
+      "doc_id": "api/maix.network.wifi",
+      "sha256": "90f84e8e98b9a830c7a2685c415c7cde162473f276e382110ae903634c99af0e",
+      "bytes": 34417,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/network.html",
+      "doc_id": "api/maix.network",
+      "sha256": "b574b6f82e5e349d397782c69523fcd687d629b3a4f0b13760a3c4f7dfe65e35",
+      "bytes": 19812,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/nn/F.html",
+      "doc_id": "api/maix.nn.F",
+      "sha256": "f4f8b844b65e9185f5d2baf883283953b6b0002493107079154e4dda5d4a99c9",
+      "bytes": 20158,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/nn.html",
+      "doc_id": "api/maix.nn",
+      "sha256": "a626daa7b5986e0f0463bf0e0ce3bbca9b6dbb4953f597ab29e04f1160c19b0e",
+      "bytes": 362007,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/peripheral/adc.html",
+      "doc_id": "api/maix.peripheral.adc",
+      "sha256": "38299f649088a978346079ab0e7b2dfc468160534259c1fca6581e08a32e40ca",
+      "bytes": 24108,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/peripheral/gpio.html",
+      "doc_id": "api/maix.peripheral.gpio",
+      "sha256": "88dcee263d40ce384849b3d7711cdf7d0e80887df4c213730d45fbc18754148c",
+      "bytes": 26759,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/peripheral/hid.html",
+      "doc_id": "api/maix.peripheral.hid",
+      "sha256": "a73fbc142bccd4f598937ffc5a0ede1bae6ebb3ba15efb373da8508935a8e904",
+      "bytes": 24906,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/peripheral/i2c.html",
+      "doc_id": "api/maix.peripheral.i2c",
+      "sha256": "fc079fe27e720b7d8114018884468983c8e587c2e999e67de9da8404098a3172",
+      "bytes": 27760,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/peripheral/key.html",
+      "doc_id": "api/maix.peripheral.key",
+      "sha256": "f88781ec66afbafdb404361cf1d066fc143251cca35eeb93ed7d01f58f4aa1b4",
+      "bytes": 27214,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/peripheral/pinmap.html",
+      "doc_id": "api/maix.peripheral.pinmap",
+      "sha256": "43ccaf6fe5b58c4790ef3a37c7696f035881de193ab9ec6ef97f2ac65d480520",
+      "bytes": 22190,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/peripheral/pwm.html",
+      "doc_id": "api/maix.peripheral.pwm",
+      "sha256": "01d3a43537cc4264c00172299ea975bb553e9ee98d29175e5fdcc001f83144a4",
+      "bytes": 25439,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/peripheral/spi.html",
+      "doc_id": "api/maix.peripheral.spi",
+      "sha256": "62e94069b6f4feecdadaf891e0f41c3ffc5121bace760c6bac60f9ce41b174a5",
+      "bytes": 25551,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/peripheral/timer.html",
+      "doc_id": "api/maix.peripheral.timer",
+      "sha256": "fe06f4a1a26215b600f3a5da811f770c338fb701e0d81b1233ab8cce44ddf6dd",
+      "bytes": 19867,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/peripheral/uart.html",
+      "doc_id": "api/maix.peripheral.uart",
+      "sha256": "34c1e2b9197c6ab499746659152ecb5ef7c5529ccda84d99750e176ea2a2bb4c",
+      "bytes": 34944,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/peripheral/wdt.html",
+      "doc_id": "api/maix.peripheral.wdt",
+      "sha256": "d59ac04d2242eefa6a0cf44d35ab15add55ac271dbf1292b6ce98104848dc9de",
+      "bytes": 21834,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/peripheral.html",
+      "doc_id": "api/maix.peripheral",
+      "sha256": "7cf1ff93c7f7b55b790c40cf46923f004d7e1ed8d68f588c798b9a542a6f2718",
+      "bytes": 20353,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/pipeline.html",
+      "doc_id": "api/maix.pipeline",
+      "sha256": "d92339accb4bcd90d793b2cba349a75e73ef7d94713f137cfdabedba63a5ec27",
+      "bytes": 34371,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/protocol.html",
+      "doc_id": "api/maix.protocol",
+      "sha256": "612faacb699149600f542838f04b8ece56d64b595ee0816fc0178d38f62dafac",
+      "bytes": 37050,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/rtmp.html",
+      "doc_id": "api/maix.rtmp",
+      "sha256": "0e9cab55718384f3d656d20aa0f50d630c68c8c8dc5a3267a88e77ee7b17f108",
+      "bytes": 28157,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/rtsp.html",
+      "doc_id": "api/maix.rtsp",
+      "sha256": "1fe7d541e1865435fe5cc5b44e4cfef1ddd70368bd4b74351965a520820492d5",
+      "bytes": 34191,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/sys.html",
+      "doc_id": "api/maix.sys",
+      "sha256": "3350cc58f8444050e14d7007b0872aec46a0d11a31bd80d8f8b34e6da6fd390f",
+      "bytes": 35436,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/tensor.html",
+      "doc_id": "api/maix.tensor",
+      "sha256": "94f61ecacdde8c536309d15c8aeb9c5de2111ee22e36290a57e124307b087f9c",
+      "bytes": 53121,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/thread.html",
+      "doc_id": "api/maix.thread",
+      "sha256": "65599703e8577e83275b4d32be0656469cc2096149635eac40e8e79d589dea95",
+      "bytes": 21861,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/time.html",
+      "doc_id": "api/maix.time",
+      "sha256": "769d3243ac1c5735438b9cc01ea529adc1013738bf31d2a1268fa6362a84708a",
+      "bytes": 51257,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/touchscreen.html",
+      "doc_id": "api/maix.touchscreen",
+      "sha256": "609d7352bd820910e828498a602f7c42f0c0ce57d553c0c2f8428042a4019def",
+      "bytes": 25515,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/tracker.html",
+      "doc_id": "api/maix.tracker",
+      "sha256": "a8c31822d5d5e6e38e0c9fc2900f5922a85bfbc160d404471c9aadd4ad006f9a",
+      "bytes": 28749,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/util.html",
+      "doc_id": "api/maix.util",
+      "sha256": "09d665fc48513df54b93f7756d3f2773abdc61334d1abe5dc1d309ab32f93030",
+      "bytes": 20600,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/uvc.html",
+      "doc_id": "api/maix.uvc",
+      "sha256": "500c9b41a969a6484f66c220661e7bdb6f2524023ca3add74c4c29ddea84309b",
+      "bytes": 25504,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/video.html",
+      "doc_id": "api/maix.video",
+      "sha256": "2dd81aaeb3f074817e71f92af98d4e5c1026f873638b4a5e1668c67163893366",
+      "bytes": 104469,
+      "lang": "api"
+    },
+    {
+      "rel_path": "maix/webrtc.html",
+      "doc_id": "api/maix.webrtc",
+      "sha256": "6806a7104f619cba76e50fe703b6f4232453616e815df828c849f7347bec7457",
+      "bytes": 35044,
+      "lang": "api"
+    }
+  ]
+}

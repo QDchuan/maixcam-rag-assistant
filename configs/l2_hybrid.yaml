@@ -1,0 +1,50 @@
+# L2：结构化语料 + 混合检索。
+#
+# 相对 L1 只改两件事（严格来说这是两级，但为了不把配置数量堆太多，
+# 这里合并成"结构 + 稀疏检索"一步；正式做消融时应拆成两份配置分别测）：
+#   1. 切分从 fixed 换成 heading（标题感知）
+#   2. 检索加入 BM25，与稠密做 RRF 融合
+#
+# 预期：整体 Recall 小幅提升，但 **signature 类问题（问 API 签名）提升巨大**。
+# 这正是"必须按 qtype 分组看"的理由——只看总分很容易误判为"不值得"。
+#
+# 用法：maixrag eval --config configs/l2_hybrid.yaml --level rag --fake
+
+corpus:
+  version: "main"
+  sources: [repo, api]
+  pin: true
+  repo_mode: archive
+
+chunking:
+  strategy: heading
+  max_tokens: 500
+  min_tokens: 80
+  overlap_tokens: 80
+  contextual_header: false
+
+index:
+  embedding:
+    provider: openai_compatible
+    base_url: "${EMBED_BASE_URL}"
+    model: "${EMBED_MODEL}"
+    api_key: "${EMBED_API_KEY}"
+  sparse:
+    enabled: true
+
+retrieval:
+  mode: retrieve
+  retrievers: [dense, bm25]
+  fusion: rrf
+  top_k: 5
+
+generation:
+  model: "${CHAT_MODEL}"
+  base_url: "${CHAT_BASE_URL}"
+  api_key: "${CHAT_API_KEY}"
+  citation_required: true
+  symbol_check: true
+  context_strategy: retrieved
+
+agent:
+  enabled: false

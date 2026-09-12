@@ -1,0 +1,43 @@
+# L-1：全文上下文（不检索）。
+#
+# 实测背景（见 docs/design/00 第 5.4 节）：
+#   中文教程 130 篇 / 713,520 字节 / 约 20.8 万 token —— **已越过
+#   20 万 token 的"全文塞进 prompt"可行区间**。
+#
+# 所以这一级的意义不是"提供一个更优方案"，而是给出**零检索损失的上界参照**：
+# 如果连"把资料全给模型"都答不对，那问题就不在检索上，而在生成或语料上。
+#
+# 两个必须做的变体（L-1a / L-1b），差别只在生成侧的 max_tokens：
+#   L-1a 单模块全文（约 2 万 token）—— 大概率优于检索
+#   L-1b 全量文字（约 30 万 token）—— 必然截断，成本高
+# 本轮实现先给出 L-1b（全量），因为"越线之后会怎样"更值得先看到。
+#
+# 用法：maixrag eval --config configs/l_minus1_full_context.yaml --level full_context --fake
+
+corpus:
+  version: "main"
+  sources: [repo, api]
+  pin: true
+  repo_mode: archive
+
+chunking:
+  strategy: heading
+  max_tokens: 500
+  min_tokens: 80
+  overlap_tokens: 80
+  contextual_header: false
+
+retrieval:
+  mode: none
+  retrievers: []
+  fusion: rrf
+  top_k: 5
+
+generation:
+  model: "${CHAT_MODEL}"
+  base_url: "${CHAT_BASE_URL}"
+  api_key: "${CHAT_API_KEY}"
+  context_strategy: full_corpus
+
+agent:
+  enabled: false

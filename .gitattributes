@@ -1,0 +1,24 @@
+# 统一换行符，避免 Windows / macOS / Linux 之间产生无意义的 diff。
+# 这个项目会在多个平台上跑（教学项目尤其如此），这一条能省掉大量噪音。
+* text=auto eol=lf
+
+# Windows 原生脚本保留 CRLF
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制文件不做换行符转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.npy binary
+*.pkl binary
+*.xz binary
+*.gz binary
+
+# 语料与评测产物：GitHub 上按文本展示，但不参与语言统计（避免污染语言占比）
+corpus/manifest.json linguist-generated=true
+corpus/reports/*.md linguist-documentation=true
+eval/datasets/*.jsonl linguist-language=JSONL

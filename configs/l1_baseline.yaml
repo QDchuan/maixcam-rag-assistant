@@ -1,0 +1,48 @@
+# L1：朴素 RAG 基线。
+#
+# 定长切分 + 单一稠密检索 + 拼接生成。
+# 这是消融阶梯的起点：后面每一级都相对它做单一变量改动。
+#
+# 用法：
+#   maixrag index build --config configs/l1_baseline.yaml --fake
+#   maixrag eval --config configs/l1_baseline.yaml --level rag --fake
+
+corpus:
+  version: "main"
+  sources: [repo, api]
+  pin: true
+  repo_mode: archive
+
+chunking:
+  strategy: fixed          # 刻意丢弃结构，作为朴素基线
+  fixed_size_tokens: 256
+  max_tokens: 500
+  min_tokens: 80
+  overlap_tokens: 80
+  contextual_header: false
+
+index:
+  embedding:
+    provider: openai_compatible
+    base_url: "${EMBED_BASE_URL}"
+    model: "${EMBED_MODEL}"
+    api_key: "${EMBED_API_KEY}"
+  sparse:
+    enabled: false         # 朴素基线只用稠密检索
+
+retrieval:
+  mode: retrieve
+  retrievers: [dense]
+  fusion: rrf
+  top_k: 5
+
+generation:
+  model: "${CHAT_MODEL}"
+  base_url: "${CHAT_BASE_URL}"
+  api_key: "${CHAT_API_KEY}"
+  citation_required: true
+  symbol_check: true
+  context_strategy: retrieved
+
+agent:
+  enabled: false
