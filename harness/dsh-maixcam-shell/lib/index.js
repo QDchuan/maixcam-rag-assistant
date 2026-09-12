@@ -203,7 +203,9 @@ export function apply(ctx, config) {
 			from: hit.from,
 			fused: Number(hit.score.toFixed(5)),
 		}))
-		return { hits, embedMs }
+		// 最高余弦：稠密那一路的绝对相似度，跨查询可比（RRF 分数不可比）。
+		const topCosine = dense.length > 0 ? dense[0].score : 0
+		return { hits, embedMs, topCosine }
 	}
 
 	/**
@@ -259,8 +261,17 @@ export function apply(ctx, config) {
 
 		const facets = []
 		for (const aspect of aspects) {
-			const { hits } = await hybrid(c, aspect, k)
-			facets.push({ aspect, n: hits.length, coverage: moduleCoverage(c, hits), hits })
+			const { hits, topCosine } = await hybrid(c, aspect, k)
+			facets.push({
+				aspect,
+				n: hits.length,
+				topCosine: Number(topCosine.toFixed(3)),
+				// 置信度分三档，不做二值判断。阈值 0.60 是从实测分布里取的：
+				// 真有证据的面落在 0.73~0.81，本地没有的面落在 0.52~0.56。
+				confidence: topCosine >= 0.7 ? 'strong' : topCosine >= 0.6 ? 'medium' : 'weak',
+				coverage: moduleCoverage(c, hits),
+				hits,
+			})
 		}
 		return {
 			query,
@@ -268,7 +279,8 @@ export function apply(ctx, config) {
 			aspects,
 			strategy: 'hybrid(rrf: dense+bm25) × 多面向',
 			totalMs: Date.now() - started,
-			empty: facets.filter((f) => f.n === 0).map((f) => f.aspect),
+			// 检索永远会返回 k 条，所以「无证据」不能只看 n===0 —— 判据是置信度。
+			empty: facets.filter((f) => f.confidence === 'weak').map((f) => f.aspect),
 			facets,
 		}
 	}
