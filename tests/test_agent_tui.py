@@ -61,8 +61,12 @@ def test_display_width_ignores_ansi_sequences():
 def test_boxed_lines_are_all_equal_width():
     """带颜色 + 中英混排的内容装进框里，每一行的显示宽度必须一致。"""
     rows = [
-        f"{C_DIM}工具调用{RESET} 88{C_DIM}   失败{RESET} 3",
-        f"{C_DIM}按工具{RESET} search_docs×31  lookup_api×25",
+        # 这些数字取自 eval/results/agent_loop.json 的 agent_stats——**别随手改大**。
+        # 它们只是"中英混排 + 带颜色"的排版素材，但**素材也必须是真数**：
+        # 测试里的示例数据会被读者当参考，而本项目正为"文档里的数字对不上产物"
+        # 做过一轮全量核对。示例用旧的 88 / search_docs×31，下次核对又得重来一遍。
+        f"{C_DIM}工具调用{RESET} 75{C_DIM}   失败{RESET} 6",
+        f"{C_DIM}按工具{RESET} search_docs×23  read_doc×20",
         "纯英文一行",
         "",
     ]

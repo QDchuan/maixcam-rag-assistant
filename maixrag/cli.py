@@ -701,9 +701,9 @@ def build_parser() -> argparse.ArgumentParser:
     ag.add_argument("question")
     ag.add_argument("--show-hits", action="store_true", help="展示召回的片段")
     ag.add_argument("--max-turns", type=int, default=0,
-                    help="轮次预算（默认 4；多跳问题需要更大）")
+                    help="轮次预算（默认取配置里的 agent.max_turns，当前 12；多跳问题需要更大）")
     ag.add_argument("--max-tool-calls", type=int, default=0,
-                    help="工具调用预算（默认 max(6, 轮次+2)）")
+                    help="工具调用预算（默认 max(6, 轮次×2)）")
     ag.add_argument("--fake-embed", action="store_true")
     ag.add_argument("--fake-chat", action="store_true",
                     help="用假的决策模型，完全不联网")

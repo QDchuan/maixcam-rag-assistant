@@ -107,8 +107,8 @@
 
 真正让它停下来的是两样**外部机制**：资料被放到眼前（有上下文时 `FakeChat` 只从资料里
 抄一个符号），和一次确定性的查表（1898 个符号 / 4868 条白名单）。
-纪律段落本身有价值——它**可测、可换、可追溯**（`maixrag/agent/prompt.py` 的
-`domain_discipline`），但它只能约束**表达**，不能补上**知识**。
+纪律段落本身有价值——它**可测、可换、可追溯**（`maixrag/agent/prompt.py` 第 214 行的
+`maixcam_rules()`，注册成段落时叫 `maixcam_rules`），但它只能约束**表达**，不能补上**知识**。
 
 **如果你答到了**：续写 vs 查表 / "知道自己不知道"不是原生能力 /
 必须靠外部机制（资料 + 白名单查表）兜住 / 措辞是约束不是知识来源 —— 说明你理解了这一层。
@@ -223,11 +223,13 @@
 > 至少两类救不回来。**第一类是覆盖面缺口**：问题本身在语料里就没有答案。
 > 最典型的是 q011（MaixCAM 2 与 MaixCAM Pro 的差异）和 q012（MaixPy 支持哪些 AI 视觉功能）——
 > 这两道题的 `must_not_contain` 是**空的**，因为真正该防的不是"串味"，而是"答不出来却答得像有依据"。
-> 它们在 L1 报告里的召回率都是 **0.00**
-> （[`eval/results/rag_L1_rag[rrf_dense+bm25].md`](<../../../eval/results/rag_L1_rag[rrf_dense+bm25].md>)），
-> agent 版对 q011 也是**拒答**
+> 在链式的融合报告里，q012 的召回率是 **0.00**，q011 是 **0.50**
+> （[`eval/results/rag_L1_rag[rrf_dense+bm25].md`](<../../../eval/results/rag_L1_rag[rrf_dense+bm25].md>)）；
+> agent 版里 q011 召回到了 1.00 却仍然**拒答**，q012 则是没召回、也没拒答
 > （[`eval/results/agent_loop.md`](../../../eval/results/agent_loop.md)）。
-> 把整份语料塞进去，这两题依然没有答案——只会更容易被编出一个。
+> 两种形态恰好各说明一件事：**召回到了也可能答不出来**（生成侧），
+> **没召回就更不可能有答案**（检索侧），而把整份语料塞进去并不能让这两题长出答案——
+> 只会更容易被编出一个。
 > **第二类是"资料和板子上真实状态不一致"**：语料本身会漂移。
 > 本项目勘察时就发现文档站与仓库对不上（站点有 `vision/dual_buff.html` 而仓库没有、
 > `customize_model_yolo.md` 与站点的 `custmize_model.html` 拼写不同，
@@ -284,7 +286,7 @@
 
    实测输出：**没有匹配（0 行）**。而 `sensor.*` 是被写在
    [`maixrag/agent/prompt.py`](../../../maixrag/agent/prompt.py) 第 **226** 行的
-   `domain_discipline` 里：
+   `maixcam_rules()` 里：
 
    > 2. **不要根据其他框架的习惯猜 MaixPy 的 API。** 特别注意三个最容易混进来的来源：
    >    OpenCV（`cv2.*`）、树莓派（`picamera`）、K210 时代的 MaixPy v1（`sensor.*`）。
@@ -313,15 +315,20 @@
      def read(self, block: bool = True, block_ms: int = -1) -> maix.image.Image
      ```
 
-**期望结果**：非空禁项 **16** 题（`concepts/00 §4` 说的"13 道禁掉的是**别的生态的 API**"
-量的是另一件事——把 q004 那种"编造设备枚举方式"排除掉之后的题数；
-两个数字都对，只是口径不同）；K210 那一格为空；`sensor.` 在评测集里 0 行、
-在 `prompt.py` 第 226 行。
+**期望结果**：非空禁项 **16** 题（q001–q006、q008–q010、q012–q018；空的只有 q007 与 q011）。
+其中 **13** 题的禁项**全部**是"别的生态的 API"——`cv2.*` / `picamera` / `RPi.GPIO` / 树莓派工具
+/ `torch.*` / `transformers.*` / `PIL.*` / `pyserial` / `nmcli` / `ffmpeg` / `gst-launch` 这一类；
+另外 **3** 题的禁项不是"串味"而是**编造的方法名**（q003 `read_frame`、q004 `enumerate_cameras` /
+`os.listdir("/dev/video")`）或**"把某个办法说成唯一办法"**（q016 `gc.collect() 是唯一办法`、
+q018 `tflite_convert 是唯一方式`）——后一类有 4 条断言，落在 q003 / q004 / q016 / q018 上。
+两个数字都对，只是口径不同（`concepts/00 §4` 数的是前一类）；K210 那一格为空；
+`sensor.` 在评测集里 0 行、在 `prompt.py` 第 226 行。
 
-> 数字口径提醒：`16` 和 `13` 都能在仓库文件里查到
+> 数字口径提醒：`16` 与 `13` 都能在仓库文件里逐条数出来
 > （[`seed.jsonl`](../../../eval/datasets/seed.jsonl) 与
 > [concepts/00 §4](../concepts/00-为什么需要RAG.md) / [tutorial 01 §5](../../tutorial/01-失败是什么样的.md)），
-> 出题时不替它们统一——这类"同一件事两种口径"正是
+> 这里说的是这两个数**分别数的是什么**，而不是替它们统一成一个数——
+> "同一件事两种口径"本身正是
 > [design 07 §5.1](../../design/07-文档体系设计.md) 的数字新鲜度检查该抓的东西。
 
 ---

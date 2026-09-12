@@ -117,8 +117,9 @@ API chunk 与教程散文在同一个池子里竞争。API chunk 对"函数签�
 但 `MRR` 从 0.557 掉到 0.453、`Context Precision` 两份都是 0.267。召回没掉、位置掉了一档半，
 这是排序质量问题，而这里唯一被动过的就是融合。按 `qtype` 分组再看方向：
 `concept` 0.500 → 0.500、`signature` 0.500 → 0.500、`troubleshoot` 0.500 → 1.000，
-而 `example` 从 **1.000 掉到 0.750**——融合把一整个 `example` 题（`q005`，YOLO 例程，标注文档就是
-`zh/vision/yolov5`）从 dense 的第 5 名挤出了 Top-5。机制在
+而 `example` 从 **1.000 掉到 0.750**——`example` 那 4 题里，`q005`（YOLO 例程，标注文档就是
+`zh/vision/yolov5`）被挤出 Top-5 丢了，`q008`、`q009` 还在榜上但从第 1 掉到第 2，
+所以这一组的召回率掉 25 pt、MRR 掉得更多（1.000×2+0.200+1.000 → 0.500×2+0+1.000）。机制在
 [`maixrag/retrieval.py`](../../../maixrag/retrieval.py)：两路先各取 20 个候选，再按
 `score(d) = Σ_r 1/(rrf_k + rank_r(d))` 重排取前 5；`zh/vision/yolov5` 在 dense 排第 5（贡献约 1/66）、
 在 BM25 排第 6（贡献约 1/67，两路合计约 0.030），而两路都排 10–20 名的片段各自拿到约两份

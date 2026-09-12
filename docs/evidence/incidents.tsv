@@ -1,9 +1,9 @@
 id	类别	症状	回归测试	关键断言	复现命令	最后验证
-01	失败处理	脚本跑完了，结果是 0 / 空的，退出码却是 0	tests/test_evaluation.py::test_empty_dataset_must_fail,maixrag/corpus/fetch.py::	空数据集必须抛错，不能当成"评测通过"	python -m pytest tests/test_evaluation.py -k empty_dataset -q	2026-09
-02	语料与检索	召回率偏低，但文档里明明有那些内容	tests/test_evaluation.py::test_recall_zero_when_doc_present_but_span_missing	文档在库里但 span 缺失时 Recall 必须是 0	python -m pytest tests/test_evaluation.py -k span_missing -q	2026-09
+01	失败处理	脚本跑完了，结果是 0 / 空的，退出码却是 0	tests/test_evaluation.py::test_empty_dataset_must_fail,maixrag/corpus/fetch.py::	空数据集必须抛错，不能当成"评测通过"（⚠️ 该断言锁的是 maixrag/evaluation/harness.py 的 load_dataset；maixrag/corpus/fetch.py 自己的空结果防御没有回归测试，此条待补）	python -m pytest tests/test_evaluation.py -k empty_dataset -q	2026-09
+02	语料与检索	召回率偏低，但文档里明明有那些内容	tests/test_evaluation.py::test_recall_zero_when_doc_present_but_span_missing	文档在库里但 span 缺失时 Recall 必须是 0（⚠️ 该断言锁的是 Recall 口径本身；本事故的修复——API 符号渲染成可检索 chunk——目前只靠 corpus/reports/stats.md 的可见信号，没有回归测试，此条待补）	python -m pytest tests/test_evaluation.py -k span_missing -q	2026-09
 03	校验与信任	校验器把正确代码判成幻觉	scripts/regress_symbol_false_positive.py::	MUST_PASS 里的四种 import 写法一个都不许误报	python scripts/regress_symbol_false_positive.py	2026-09
-04	状态生命周期	统计数字对不上，比预期少很多	scripts/check_eval_consistency.py::	报告的每一条数字都能与结果文件对上	python scripts/check_eval_consistency.py	2026-09
+04	状态生命周期	统计数字对不上，比预期少很多	scripts/check_eval_consistency.py::	报告的每一条数字都能与结果文件对上（⚠️ 该脚本查的是 .md 与 .json 是否自洽——那是另一类"产物被覆盖"的事故；本事故的修复 AgentApp.note_execution / agent_stats 目前没有任何测试锁着，此条待补）	python scripts/check_eval_consistency.py	2026-09
 05	失败处理	某个指标是 0.000 / 100%，看起来很好	scripts/inspect_eval.py::	每条指标必须显示自己的覆盖面（分母）	python scripts/inspect_eval.py	2026-09
-06	参数与调优	agent 有时候比不用 agent 还差	tests/test_agent_loop.py::test_budget_exhaustion_degrades_gracefully,tests/test_agent_loop.py::test_no_budget_means_runaway	预算耗尽必须优雅降级；没有预算则必然跑飞	python -m pytest tests/test_agent_loop.py -k budget -q	2026-09
+06	参数与调优	agent 有时候比不用 agent 还差	tests/test_agent_loop.py::test_budget_exhaustion_degrades_gracefully,tests/test_agent_loop.py::test_no_budget_means_runaway,tests/test_agent_loop.py::test_default_budget_is_conservative	预算耗尽必须优雅降级；没有预算则必然跑飞；Budget() 的兜底默认值必须保守	python -m pytest tests/test_agent_loop.py -k budget -q	2026-09
 07	校验与信任	校验工具打了勾，但它其实什么都没检查	tests/test_symbol_verification.py::test_bare_code_is_actually_parsed,scripts/regress_check_api_usage.py::	裸代码必须解析出符号；"解析不出"必须是失败	python scripts/regress_check_api_usage.py	2026-09
 08	工具接口	检索明明排第一，agent 却反复换措辞搜索到预算耗尽	tests/test_agent_progress.py::test_read_doc_returns_the_whole_document_in_order,tests/test_agent_progress.py::test_repeated_identical_evidence_stops_the_loop	找到的文档必须能整篇打开；连续无新证据必须提前终止	python scripts/diag_retrieval_miss.py	2026-09

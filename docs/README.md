@@ -36,7 +36,7 @@
 
 ---
 
-## 文档的六层
+## 文档的七层
 
 | 层 | 回答什么 | 面向 | 什么时候看 |
 | --- | --- | --- | --- |
@@ -92,7 +92,7 @@
 
 ---
 
-## 两个可以立刻跑的演示
+## 可以立刻跑的演示（2 条终端演示 + 3 个演示脚本）
 
 不用配任何东西，`git clone` 之后就能跑：
 
@@ -125,7 +125,7 @@ python scripts/demo_sandbox.py    # 安全错：权限越界，"拦住了≠拦�
 | agent 工具 | 五个：`search_docs` · **`read_doc`** · `lookup_api` · `list_api` · `check_api_usage` |
 | 终端演示 | `python -m maixrag demo`（呈现层是插件，可拔） |
 | 配置 | `python -m maixrag setup`（对话式向导 + 密钥安全落盘 + 连通性自检） |
-| 测试 | **224 个**（223 通过 + 1 显式跳过） |
+| 测试 | **228 个用例**（227 通过 + 1 显式跳过）；源文件里是 224 个 `def test_` 函数 |
 
 ### 第一个真实的消融结果
 
@@ -150,9 +150,10 @@ python scripts/demo_sandbox.py    # 安全错：权限越界，"拦住了≠拦�
 > **文档里的每一个数字，都能被一条命令复现。**
 
 具体机制（见 [文档体系设计](./design/07-文档体系设计.md)）：
-- 论断表 `evidence/claims.tsv` 记录"断言 → 复现命令 → 期望形态 → 最后验证"
 - 每篇事故都绑定一个**真实存在的回归测试**（[`evidence/incidents.tsv`](./evidence/incidents.tsv)）
 - **没有回归测试的事故文档，说明修复没有固化——那是文档在说谎**
+- 设计里还有一张论断表 `evidence/claims.tsv`（"断言 → 复现命令 → 期望形态 → 最后验证"）与消融总表 `evidence/ablation.md`——
+  **这两份尚未落地**，`docs/evidence/` 目前只有 `incidents.tsv` 与 `README.md`
 
 这条纪律本身也被工具检查：
 
@@ -167,7 +168,7 @@ python scripts/check_evidence.py   # 事故 → 回归测试的绑定是否还�
 
 每一章都有习题，分四组：**复现 / 诊断 / 改造 / 判断**。
 
-参考答案在 [`docs/exercises/answers.md`](./exercises/)。
+参考答案在 [`docs/exercises/answers/`](./exercises/answers/)（与题目文件同名，一章一份）。
 
 **C 组（改造）是核心**：它逼你先写下预测，再验证。
 "预测错了"恰恰是最有价值的学习时刻——而绝大多数教学文档不给你犯错的机会。

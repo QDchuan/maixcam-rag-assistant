@@ -57,7 +57,27 @@ CASES: list[tuple[str, str, bool]] = [
 ]
 
 
+def _enable_utf8() -> None:
+    """让 stdout/stderr 用 UTF-8。
+
+    Windows 上默认是 GBK，而本脚本会打印 `→` `·` 这类符号——重定向到文件
+    或管道时直接 `UnicodeEncodeError` 崩掉。**在本机终端里跑不出来，
+    却在 CI 或 `> out.txt` 时崩**，是最难查的那类：你的机器上它是好的。
+
+    （项目里其它脚本都有这一段，唯独这个漏了。）
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+        except Exception:
+            pass
+
 def main() -> int:
+    # **这一行是必须的。** 第一版只把 `_enable_utf8` 的定义注入了进来，
+    # 却没注入调用（我的替换串按 `def main(argv)` 写的，而真实签名是
+    # `def main()`）——于是留下一个**死函数**，看起来像修好了，实际一点没生效。
+    # 这正是这个项目最忌讳的形态：定义了但没调用，比没定义更难发现。
+    _enable_utf8()
     roster_path = Path(__file__).resolve().parent.parent / "corpus/processed/api_roster.txt"
     if not roster_path.exists():
         print(f"[错误] 找不到白名单 {roster_path}；请先运行 corpus build")

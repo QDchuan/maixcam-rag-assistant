@@ -102,9 +102,9 @@ MaixCam 上的 MaixPy v4 是重写过的（[`corpus/raw/repo/faq.md`](../../corp
 本章的"为什么"不是推演，有四组真实数据支撑。
 
 **证据一：幻觉有具体的形状，可以被列成清单。**
-`eval/datasets/seed.jsonl` 的 18 道题里，有 13 道的 `must_not_contain` 禁掉的是
-**别的生态的 API**（`cv2.VideoCapture`、`cv2.findContours`、`RPi.GPIO`、`pyaudio`、
-`torchvision.models`、`serial.Serial`、`nmcli`、`ffmpeg -f v4l2` ……）。[本项目实测]
+`eval/datasets/seed.jsonl` 的 18 道题里，16 道带 `must_not_contain` 禁项，
+其中 13 道禁掉的是**别的生态的 API**（`cv2.VideoCapture`、`cv2.findContours`、`RPi.GPIO`、
+`pyaudio`、`torchvision.models`、`serial.Serial`、`nmcli`、`ffmpeg -f v4l2` ……）。[本项目实测]
 说明要防的幻觉不是随机噪声，而是有规律的"串味"。
 
 **证据二：没有资料时，模型的纪律反应是拒答。**
@@ -112,7 +112,7 @@ L1 链式基线在 YOLO 那道题上明确说"资料中没有给出完整代码�
 （OpenCV、K210 时代 MaixPy v1）的习惯推测 API"，同一批测试的**符号级幻觉率 0.000**。
 [本项目实测，见 [05 伪装成好消息的 0](../postmortem/05-伪装成好消息的0.md)]
 但这个 0.000 起初是**假的好消息**——它其实是因为"模型压根没写代码"（覆盖率 0/18）；
-修好检索后覆盖率变成 18/18，同样的 0.000 才是真的。
+修好检索后覆盖率变成 16/18，同样的 0.000 才是真的。
 
 **证据三：把它做成循环之后，能力被"解锁"了。**
 同一个 YOLO 问题，agent 版给了完整可运行代码，靠自己改写查询、切到 `lookup_api`、
@@ -159,7 +159,10 @@ L1 链式基线在 YOLO 那道题上明确说"资料中没有给出完整代码�
 （本项目的 3838 个 chunk 在磁盘上），每次回答时现查现给。
 
 这个区别不是修辞，它决定了系统的全部性质：文档改了，下一次回答就是新的
-（本项目为此把语料版本固定到 commit，见 [01 系统架构设计 · 4.1](../design/01-系统架构设计.md)）；
+（本项目为此**把语料版本固定到 commit**——不过要如实说明：这是 `corpus fetch`
+会做的动作，而仓库里现在这一版 `corpus/manifest.json` 是 `corpus adopt` 从磁盘重建的，
+`pinned: false`、`commit` 为空，即**尚未固定上游版本**，见
+[01 系统架构设计 · 4.1](../design/01-系统架构设计.md)）；
 你可以**指出答案依据的原文**；你也可以让校验器**逐个核对答案里出现的符号**。
 如果知识被"记"进了权重，上面三件事都做不到。
 
@@ -203,7 +206,7 @@ L1 链式基线在 YOLO 那道题上明确说"资料中没有给出完整代码�
    说出**代价**和**失效条件**，不要只给结论。
 4. **（工程）** 哪些幻觉是"把权威文档喂给模型"也救不回来的？举一类并说明理由。
 
-**动手题**见 tutorial 00：把 `eval/datasets/seed.jsonl` 里的 13 条 `must_not_contain`
+**动手题**见 tutorial 00：把 `eval/datasets/seed.jsonl` 里 13 道题的 `must_not_contain`
 按"串了哪个生态"分类（OpenCV / 树莓派 / K210 时代 / 其他），
 再挑一条去 `corpus/raw/repo/` 里找出**官方的正确写法**。
 

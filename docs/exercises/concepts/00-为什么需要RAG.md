@@ -56,10 +56,10 @@
 
 **H1. 把 `eval/datasets/seed.jsonl` 里的 `must_not_contain` 按"串了哪个生态"分一遍类，再找出至少一处官方的正确写法。**
 
-- 提示：四格是 OpenCV / 树莓派 / K210 时代 MaixPy v1 / 编造不存在的方法。分完之后留意**有一格是空的**——去 `maixrag/agent/prompt.py` 里找它被写在哪。
+- 提示：四格是 OpenCV / 树莓派 / K210 时代 MaixPy v1 / 编造不存在的方法。分完之后留意**有一格是空的**——去 `maixrag/agent/prompt.py` 里找它被写在哪（第 226 行，`maixcam_rules()` 那一段）。
 - **验收标准**：
   1. 报出"18 题里带非空 `must_not_contain` 的有几题"这个数；
-  2. 四格里**有且只有一格是空的**——指出是哪一格、它在评测集里为什么空，并说清"写了纪律 ≠ 测了纪律"指的是哪一处纪律（给出文件与行号）；
+  2. 四格里**至少有一格是空的**——指出 K210 时代的 MaixPy v1（`sensor.*`）那一格为什么在评测集里为空，并说清"写了纪律 ≠ 测了纪律"指的是哪一处纪律（给出文件与行号）；
   3. 至少一条禁项能在 `corpus/raw/repo/` 或 `corpus/raw/api/` 里找到对应的官方原文（给出文件路径 + 原句或行号）。
 - 依据：[tutorial 01 §4.1 / §5 / §6](../../tutorial/01-失败是什么样的.md) · [`eval/datasets/seed.jsonl`](../../../eval/datasets/seed.jsonl) · [`maixrag/agent/prompt.py`](../../../maixrag/agent/prompt.py)
 > 参考答案：[answers/00-为什么需要RAG.md](../answers/00-为什么需要RAG.md) 第 H1 题

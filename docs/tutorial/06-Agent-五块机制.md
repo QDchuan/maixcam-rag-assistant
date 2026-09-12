@@ -144,8 +144,8 @@ Windows 上把 `python` 换成 `.venv\Scripts\python.exe`（Linux/macOS 用 `.ve
 在列 `规范化+解析链接` 下都是 `拦住 ✅`。
 **同一批路径，两种判定给出相反结论——"拦住了"和"拦对了"是两回事。**
 场景一还打印了 `实际写入的位置`，那是工作区之外的临时目录：在没有策略时，越界写入真的发生了。
-若本机不允许创建符号链接（Windows 常见），第三行会显示"该用例由单元测试覆盖"，
-这是**显式跳过**，不是通过。
+若本机不允许创建符号链接（Windows 常见），符号链接那一条（以括注形式出现在表下，
+不是表格里的一行）会显示"该用例由单元测试覆盖"，这是**显式跳过**，不是通过。
 
 **第四个现场：五块机制在线上的样子。** 它不联网也能跑
 （前置：按 [00 主线导览 · 0](./00-主线导览.md) 建好语料与索引）：
@@ -154,8 +154,8 @@ Windows 上把 `python` 换成 `.venv\Scripts\python.exe`（Linux/macOS 用 `.ve
 python -m maixrag --config configs/l2_hybrid.yaml agent "MaixPy 里怎么做 YOLO 物体检测？给出完整例程" --fake-chat --max-turns 3
 ```
 
-输出里能看到本章的四件事同时出现：`可用工具` 一节列出四个工具的名字、描述与能力
-（`[pure]`，这就是 3.2 说的"模型看到的暴露面"）；`提示词段落：persona, maixcam_rules`
+输出里能看到本章的四件事同时出现：`已注册工具：` 一节列出**五个**工具的名字、描述与能力
+（都是 `[pure]`，这就是 3.2 说的"模型看到的暴露面"）；`提示词段落：persona, maixcam_rules`
 （装配的静态前缀）；`【执行轨迹】` 逐轮打印决策；末尾
 `结束原因：final   消耗：{'turns': '2/3', 'tool_calls': '1/6', 'tokens': '0/60000'}`
 （预算记账）。
@@ -171,7 +171,7 @@ python -m maixrag --config configs/l2_hybrid.yaml agent-eval --max-turns 10 --fa
 本次复跑它是 `Recall@K = 0.028`、`工具调用总数 1`、`平均每题工具调用 0.1 次/题`，
 报告开头还有两行警告：`⚠️ 决策用的是假模型：只验证流程，不代表真实表现`。
 **别把这个 0.028 读成"agent 很差"**——它读作"假模型的评测没有意义"。
-（同配置换真实模型，文档记录是 0.556；链式本次复跑是 0.694。
+（同配置换真实模型，文档记录是 0.556；链式在 `configs/l2_hybrid.yaml`（rrf:dense+bm25）上的本地报告是 0.611。
 这两个数不是同一时刻量的，不要直接相减——详见 6.4。）
 
 ## 5. 证据
@@ -184,10 +184,10 @@ python -m maixrag --config configs/l2_hybrid.yaml agent-eval --max-turns 10 --fa
 | 路径越界的两种判定 | 前缀判断：2/2 放行；规范化：2/2 拦住 | [本项目实测]（场景三；符号链接一行视本机权限） |
 | 连续同类失败的截止点 | `max_repeated_errors=3` → 第 3 轮停止，不是烧完 50 轮 | [本项目实测]（`test_repeated_same_error_stops_early`） |
 | 默认预算 | `max_turns=6` · `max_tool_calls=12` · `max_tokens=60000` | [本项目实测]（`Budget` 默认值） |
-| agent 的真实成本（18 题） | 75 次工具调用，平均 4.2 次/题：`search_docs` 31 · `lookup_api` 25 · `check_api_usage` 21 · `list_api` 11 | [本项目实测] |
+| agent 的真实成本（18 题） | 75 次工具调用，平均 4.2 次/题：`search_docs` 23 · `read_doc` 20 · `check_api_usage` 15 · `lookup_api` 13 · `list_api` 4 | [本项目实测]（`eval/results/agent_loop.json` 的 `agent_stats`，该文件由 `agent-eval` 生成） |
 | YOLO 题：4 轮失败、10 轮给出可运行代码并自检两次 | 见轨迹 | [本项目实测] |
 | 检索轴：链式 vs agent（真实模型，文档冻结时） | Recall@K 0.611 → 0.667；MRR 0.453 → 0.416 | [本项目实测]，**但见第 6 节** |
-| 检索轴：链式（本次复跑，`configs/l2_hybrid.yaml`，rrf:dense+bm25） | Recall@K **0.694**（concept 0.688 / example 0.750 / signature 0.500 / troubleshoot 1.000） | [本项目实测]（本次复跑，比文档记录的 0.611 高——**数字会随语料与配置漂移**） |
+| 检索轴：链式（`configs/l2_hybrid.yaml`，rrf:dense+bm25） | Recall@K **0.611**（concept 0.500 / example 0.750 / signature 0.500 / troubleshoot 1.000） | [本项目实测]（来源 `eval/results/rag_L1_rag[rrf_dense+bm25].md`；把切分改成 `fixed` 会升到 0.694，那是**另一份配置**，见 [03 · 5](./03-语料工程.md)） |
 | 检索轴：agent + `--fake-chat`（同一配置） | Recall@K **0.028**（18 题里只有 q001 命中 0.50），工具调用总数 **1** | [本项目实测]——**这是一个无效测量，见 6.4** |
 
 ## 6. 失败的样子
@@ -237,7 +237,7 @@ python -m maixrag --config configs/l2_hybrid.yaml agent-eval --max-turns 10 --fa
 2. **agent 的检索轴数字比链式差，不代表 agent 更差。**
    Recall@K 那把尺子只看第一次检索的 Top-5，而 agent 的正确文档出现在第 2、3 次检索里——
    **它量不了 agent**。当一把尺子量不出差异时，先怀疑尺子。
-   另外注意：链式本次复跑是 **0.694**，而文档里 agent 的 0.556 来自更早的冻结版本，
+   另外注意：链式那一份本地报告是 **0.611**，而文档里 agent 的 0.556 来自更早的冻结版本，
    **两个数不是同一时刻量的，不要直接相减**。详见 [tutorial 00 · 4.3](./00-主线导览.md)。
 
 ## 7. 自检
@@ -264,7 +264,9 @@ python -m maixrag --config configs/l2_hybrid.yaml agent-eval --max-turns 10 --fa
 python -m pytest tests/test_agent_registry.py tests/test_agent_tools.py tests/test_agent_loop.py tests/test_agent_prompt.py tests/test_agent_sandbox.py -q
 ```
 
-**期望形态**：全部通过、没有失败（本项目全量是 127 通过 + 1 显式跳过）
+**期望形态**：全部通过、没有失败（上面这个子集是 **97 通过 + 1 显式跳过**；
+本项目全量是 **227 通过 + 1 显式跳过**。注意仓库 `pyproject.toml` 里已经写了
+`addopts = "-q"`，所以命令里再加 `-q` 会变成 `-qq`、**汇总行不打印**——没有失败块就是全过。）
 `[本项目实测]`。测试里最值得读的三条断言在 `tests/test_agent_loop.py`：
 `test_tool_failure_is_observation_not_termination`（失败回灌）、
 `test_repeated_same_error_stops_early`（提前终止）、
@@ -323,7 +325,7 @@ python -m maixrag --config configs/l2_hybrid.yaml ask "MaixPy 里怎么做 YOLO 
 
 ## 相关
 
-- 上一章：[05 提示词装配](./05-评测.md)
+- 上一章：[05 评测](./05-评测.md)
 - 下一章：[07 端到端评测](./07-端到端.md) · [08 终端演示](./08-终端演示.md)
 - 概念：[06 Agent 与链的区别](../concepts/06-Agent与链的区别.md) ·
   [08 权限与沙盒](../concepts/08-权限与沙盒.md)
