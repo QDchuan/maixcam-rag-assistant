@@ -24,8 +24,10 @@
 ```
 harness/
   dsh-maixcam-shell/     dsh Web 插件包 —— 这就是「壳」
-    lib/index.js         宿主半边：一个 Loader 座位
-    lib/client.js        浏览器半边：品牌、领域面板（手写的 lazy-CJS bundle，无构建）
+    lib/index.js         宿主半边：语料接入点、三条 /api 路由、两个 agent 工具
+    lib/corpus.js        加载与校验构建期产物；嵌入 + 余弦检索
+    lib/tools.js         agent 工具：search_docs / lookup_api
+    lib/client.js        浏览器半边：品牌 + 知识库面板（手写 lazy-CJS bundle，无构建）
     cordis.patch.yml     bundle 层，供 `dsh plugin add` 使用
   tools/eyes.mjs         无头浏览器验证工具：读文本、量元素、截图
   install.py             把壳装进某个 dsh profile（也可 --check / --uninstall）
@@ -40,29 +42,63 @@ python -m harness.install --uninstall  # 撤回
 ```
 
 装完重启 `dsh web`，侧栏就应该从「deepseek / LOCAL BUILD」变成
-「MaixCAM 开发助手 / MaixPy」，首屏标题前也是 MaixCAM 的图标。
+「MaixCAM 开发助手 / MaixPy」，多出一个「MaixCAM 知识库」面板入口。
 
 它**不改 DeepSeek Harness 本身**：只在 `$DSH_HOME/profiles/<profile>/plugins/` 下放一个包，
-再往那个 profile 的 `cordis.patch.yml` 里插一段带标记的行。标记之外的字节一个都不碰，
-所以别人装在同一个 profile 里的插件不受影响，`--uninstall` 也能干净撤回。
+再往那个 profile 的 `cordis.patch.yml` 里插一段带标记的行（含仓库根目录，宿主半边靠它找语料）。
+标记之外的字节一个都不碰，所以别人装在同一个 profile 里的插件不受影响，`--uninstall` 也能干净撤回。
+
+## 检索是怎么接进去的
+
+```
+提问 ──► 嵌入（本机 Ollama，bge-m3，OpenAI 兼容 /embeddings，1024 维）
+      ──► 与 indexes/vector/vectors.npy 逐行余弦 ──► top-k
+      ──► 每条带：文档标题 / 标题路径 / 切片类型 / 相似度 / 原文链接
+```
+
+只在**运行期做查询**：没有索引构建、没有分词器、没有第二个进程。抓语料、切分、
+抽 API 符号、建索引这些重活全在构建期，由教学主线的 Python 管线产出。
+
+**为什么运行期只有稠密那一路**：`indexes/bm25.json` 是按 `zh_identifier`（jieba 分中文词）
+分词后的统计量，要在 Node 里复用它就得先复刻分词器 —— 要么背词典，要么引原生扩展，
+都不划算。所以稀疏留在 Python 侧，运行期走嵌入。详见
+[`../docs/design/06-项目结构与两条分支.md`](../docs/design/06-项目结构与两条分支.md) §3.6.1。
+
+**语料和索引对不上就拒绝服务**：向量是按 `chunk_id` 顺序存的，两份产物一旦错位，
+检索会安静地返回错片段。所以加载时逐条核对，不一致就抛错、`/search` 返 503 并说明原因 ——
+**不返回空结果**，因为空结果会被模型读成「知识库里没有」，然后继续凭记忆回答。
+
+## 它往哪些座位上放了东西
+
+```
+DSH Web 前端（已构建好，不动）
+  └─ 槽位 root
+       ├─ sidebar
+       │    ├─ sidebar.brand.mark      ← MaixCAM 图标
+       │    ├─ sidebar.brand.name      ← MaixCAM 开发助手 / MaixPy
+       │    └─ sidebar.panellist       ← 知识库入口图标（list：新增一格）
+       ├─ main
+       │    └─ main[key=maixcam-kb]    ← 知识库面板（keyed：新增一格）
+       └─ main.conversation
+            └─ conversation.hero.brand.mark  ← 首屏标题前的图标
+```
+
+`sidebar.panellist` 的 `id` 与 `main` 的 `key` 用同一个值配对 —— 侧栏拥有按钮，
+点它就切到这块主面板。
+
 
 ## 「壳」是怎么接上去的
 
 DSH 的 Web 前端有一个**槽位（slot）系统**：布局本身是壳提供的，功能插件往座位
 （occupant）里放自己的东西。所以做定制不需要 fork 前端，也不需要重新构建 Web 包。
 
-```
-DSH Web 前端（已构建好，不动）
-  └─ 槽位 root
-       ├─ sidebar
-       │    ├─ sidebar.brand.mark    ← 我们占了：MaixCAM 图标
-       │    └─ sidebar.brand.name    ← 我们占了：MaixCAM 开发助手
-       ├─ main.conversation
-       │    ├─ conversation.hero.brand.mark  ← 我们占了：首屏图标
-       │    ├─ conversation.composer.dock    ← 待占：领域入口
-       │    └─ ...
-       └─ ...
-```
+一个座位有三种形态，登记语义完全不同：
+
+| 形态 | 语义 | 本文用到的 |
+| --- | --- | --- |
+| `single` | 一格一人，登记即**替换** | `sidebar.brand.mark` / `.name`、`conversation.hero.brand.mark` |
+| `list` | 加一格，`id` 是自己起的 | `sidebar.panellist` |
+| `keyed` | 按 `key` 派发，登记即新增一格 | `main` |
 
 插件包只要在 `package.json` 里声明 `dsh.client`，并把浏览器半边放在 `exports["./client"]`，
 宿主就会把它当浏览器插件加载 —— **没有构建步骤**。浏览器半边直接用宿主自己的
@@ -125,9 +161,16 @@ node harness/tools/eyes.mjs --url <URL> --eval "document.querySelector('.dsh-mx-
 
 ## 还没做的
 
-- RAG 接入点（检索服务 / 工具 / 证据面板）
-- 领域面板：检索轨迹、语料地图
-- `maixcam` settings 命名空间
-- Agent preset：MaixCAM 助手的回答纪律
+按价值排序，都记在 [`../docs/design/06-项目结构与两条分支.md`](../docs/design/06-项目结构与两条分支.md) §3：
 
-见 [`../docs/design/06-项目结构与两条分支.md`](../docs/design/06-项目结构与两条分支.md) §3。
+1. **Agent preset：MaixCAM 助手的回答纪律。** 现在两个检索工具注册在宿主平面，
+   对每个会话都可见；但「先查再答、答必带出处、没查到就说不知道」这套纪律还没有
+   落到一份 preset 的提示词段落里。少了它，工具只是"可以调用"，不是"必须调用"。
+2. **`check_api_usage`**：把教学主线那份符号白名单校验（导入别名解析 + 实例类型推断）
+   接到运行期，这样模型写出来的整段代码可以被机器核对，而不是只核对单个符号。
+3. **检索轨迹 / 溯源面板**：`tool.call.toolview` 按工具名派发，可以在会话里就地
+   渲染「这次检索命中了什么」。目前工具结果是一段格式化文本，够读但不够好看。
+4. **稀疏 + 融合 + 重排**：需要先解决 §3.6.1 那个分词器边界（要么把 Python 检索
+   做成服务，要么接受一份 JS 分词器）。
+5. **`maixcam` settings 命名空间**：现在配置写在 profile 补丁行里，改一次要重装。
+
