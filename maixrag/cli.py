@@ -755,6 +755,43 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def main_demo(argv: list[str] | None = None) -> int:
+    """`maixcam_agent` 这个命令的入口：**默认直接开演示**。
+
+    为什么要有它，而不是让用户敲 `maixrag demo`：
+
+    > 一个要敲四个词、还得先 `cd` 到仓库、还得激活 venv 的命令，
+    > **等于没有这个命令。**
+
+    装成全局命令之后，任何时候打开终端敲 `maixcam_agent` 就起来了。
+
+    行为上有两个细节：
+
+    - **不给参数 = 交互模式**，因为"打开它"最自然的期待就是"我要开始问了"；
+    - **第一个参数是已知子命令时不注入 `demo`**，所以 `maixcam_agent eval --help`
+      也能用（否则会变成 `demo eval --help`，报一个看不懂的错）。
+    """
+    import sys as _sys
+
+    args = list(argv) if argv is not None else _sys.argv[1:]
+    if not args or args[0].startswith("-"):
+        args = ["demo", *args]
+    else:
+        known = _subcommands()
+        if args[0] not in known:
+            # 不是子命令就当问题：`maixcam_agent "MaixCAM 的 GPIO 怎么用？"`
+            args = ["demo", *args]
+    return main(args)
+
+
+def _subcommands() -> set[str]:
+    import argparse
+
+    return {n for a in build_parser()._actions
+            if isinstance(a, argparse._SubParsersAction)
+            for n in a.choices}
+
+
 def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         try:

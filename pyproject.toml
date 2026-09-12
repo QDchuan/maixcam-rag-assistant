@@ -25,6 +25,9 @@ dev = ["pytest>=8.0"]
 
 [project.scripts]
 maixrag = "maixrag.cli:main"
+# 全局命令：任何时候打开终端敲 `maixcam_agent` 就能启动演示，
+# 不用 cd、不用激活 venv。装法见 scripts/install_command.py。
+maixcam_agent = "maixrag.cli:main_demo"
 
 [tool.setuptools]
 packages = ["maixrag", "maixrag.agent", "maixrag.corpus", "maixrag.indexing", "maixrag.evaluation"]
