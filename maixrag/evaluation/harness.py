@@ -251,6 +251,31 @@ def extract_code_blocks(text: str) -> list[str]:
     return [m.group(1) for m in _CODE_FENCE.finditer(text)]
 
 
+def _code_regions(text: str, *, assume_code: bool = False) -> list[str]:
+    """要拿去查符号的"代码区域"。
+
+    两种调用形态要分开，**而且必须由调用方说清是哪一种**：
+
+    | 调用方 | 传进来的东西 | 该查哪里 |
+    | --- | --- | --- |
+    | 生成轴评测 | 一整段自然语言答案 | 只查 ``` 围栏里（正文提到一个名字不算断言） |
+    | `check_api_usage` 工具 | 一段裸 Python 源码 | 整段都查（它本来就没有围栏） |
+
+    原来这里**无条件只找围栏**，于是工具对任何裸代码都返回"检查了 0 个符号"，
+    而工具把 0 当作"没有可校验的符号"**返回成功**——第一级防幻觉校验
+    在最需要它的那条路径上一次也没生效，还对模型说"没问题"。
+
+    这个 bug 的形态值得记住：**不是逻辑写错了，是调用方与被调方对
+    "这是什么文本"的理解不一致，而且没有任何地方强制它们对齐。**
+    所以修法不是"猜"，是让调用方把意图显式传进来。
+
+    见 [事故 01](../postmortem/01-静默的空结果.md)：报"0 篇"、退 0 码、看起来像成功。
+    """
+    if assume_code:
+        return [text] if text.strip() else []
+    return extract_code_blocks(text)
+
+
 def maix_aliases(code: str) -> tuple[dict[str, str], dict[str, str]]:
     """解析导入语句，返回 (模块别名, 符号别名)。
 
@@ -326,11 +351,13 @@ def infer_instance_types(code: str, modules: dict[str, str],
     return types
 
 
-def extract_symbol_references(text: str) -> list[str]:
+def extract_symbol_references(text: str, *,
+                              assume_code: bool = False) -> list[str]:
     """抽出答案里引用的 maix 符号，**解析导入别名后**给出限定名。
 
-    只看代码块——正文里提到某个名字不算"声称它存在"，
-    但代码块里用了就是明确断言。
+    `assume_code=True` 表示"传进来的是裸代码，没有 markdown 围栏"
+    （`check_api_usage` 工具就是这么调的）；默认按自然语言答案处理，
+    正文里提到一个名字不算"声称它存在"，只有围栏里的代码才算。
 
     必须覆盖三种写法，缺一个就等于对最常见的一大类代码失明：
 
@@ -340,7 +367,7 @@ def extract_symbol_references(text: str) -> list[str]:
     """
     refs: set[str] = set()
 
-    for block in extract_code_blocks(text):
+    for block in _code_regions(text, assume_code=assume_code):
         # 写法 1：全限定名
         refs.update(_SYMBOL_REF.findall(block))
 
@@ -394,12 +421,16 @@ def _symbol_is_valid(ref: str, roster: set[str]) -> bool:
     return False
 
 
-def check_symbols(text: str, roster: set[str]) -> tuple[list[str], int]:
+def check_symbols(text: str, roster: set[str], *,
+                  assume_code: bool = False) -> tuple[list[str], int]:
     """第一级校验：符号存在性。
 
     返回 (不存在的符号, 检查总数)。
+
+    `assume_code=True` 用于"传进来的是裸代码"的场景（`check_api_usage` 工具）。
+    见 `_code_regions` 的说明：这个参数是那次静默放行 bug 的修复点。
     """
-    refs = extract_symbol_references(text)
+    refs = extract_symbol_references(text, assume_code=assume_code)
     unknown = [r for r in refs if not _symbol_is_valid(r, roster)]
     return unknown, len(refs)
 

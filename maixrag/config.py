@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import os
 import re
-from dataclasses import dataclass, field, fields, is_dataclass
+from dataclasses import asdict, dataclass, field, fields, is_dataclass
 from pathlib import Path
 from typing import Any, get_type_hints
 
@@ -221,7 +221,20 @@ class Config:
         # 先载入 .env，这样配置里的 ${VAR} 才有东西可插值
         load_dotenv(root / ".env")
         if path is None:
-            cfg = cls(project_root=root)
+            # **默认配置也必须走一遍 ${VAR} 展开。**
+            #
+            # 这里原来直接返回 `cls(project_root=root)`，于是内置默认值里的
+            # `${EMBED_API_KEY}` 会以**字面量**留在配置里，一路走到
+            # `make_embedder` 才炸，报"未配置嵌入模型的 API Key"——
+            # 而用户明明在 `.env` 里配了。
+            #
+            # 这类 bug 的形态值得记住：**校验没错、密钥没错、报错信息也没错，
+            # 错的是"两条代码路径只有一条做了该做的处理"。**
+            # 走 `--config` 时展开、走默认值时没展开，于是故障只在一半的用法里出现。
+            raw = asdict(cls())
+            raw.pop("project_root", None)  # 路径不是配置内容，由调用方给
+            cfg = _build(cls, _expand_env(raw), "config")
+            cfg.project_root = root
             cfg._validate()
             return cfg
 

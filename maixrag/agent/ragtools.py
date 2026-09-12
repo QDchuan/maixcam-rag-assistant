@@ -164,8 +164,25 @@ class RagTools:
         """
         if not code.strip():
             return ToolResult.failure("code 不能为空", kind="invalid_args")
-        unknown, checked = check_symbols(code, self.roster)
+        unknown, checked = check_symbols(code, self.roster, assume_code=True)
         if checked == 0:
+            # **"一个符号都没解析出来"必须和"检查通过"分开。**
+            #
+            # 这里原来直接返回 success，于是校验器失效时对模型说的是
+            # "没问题，用吧"。一个静默放行的防幻觉校验比没有校验更危险——
+            # 它给了模型（和人）一个虚假的安心。
+            #
+            # 现在分两种情况：代码里根本没有 maix 痕迹才算"没什么可查的"；
+            # 明明 import 了 maix 却一个符号都认不出，那就是**校验器坏了**，
+            # 必须报失败，让模型知道这一关没过去。
+            if "maix" in code or "gpio" in code or "camera" in code:
+                return ToolResult.failure(
+                    "第一级校验没能从这段代码里解析出任何 maix 符号，"
+                    "但它看起来确实在用 MaixPy。**这表示校验器失效了，"
+                    "不等于代码通过。**请改用 lookup_api 逐个确认符号，"
+                    "或把代码放进 ```python 代码块再试。",
+                    kind="internal",
+                )
             return ToolResult.success(
                 "代码里没有出现可校验的 maix 符号（没有 `maix.*` 引用，"
                 "也没有从 maix 导入后的调用）。"
