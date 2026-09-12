@@ -31,8 +31,11 @@ harness/
     lib/tools.js         agent 工具：search_docs / lookup_api
     lib/client.js        浏览器半边：品牌 + 知识库面板（手写 lazy-CJS bundle，无构建）
     cordis.patch.yml     bundle 层，供 `dsh plugin add` 使用
+  maixcam-assistant/     agent preset —— 这个助手的「人格与纪律」
+    agent.cordis.yml     随包 `standard` preset 的副本，只改了 persona 那一行
+    preset.yml           显示名与描述
   tools/eyes.mjs         无头浏览器验证工具：读文本、量元素、截图
-  install.py             把壳装进某个 dsh profile（也可 --check / --uninstall）
+  install.py             装上面两样（也可 --check / --uninstall）
 ```
 
 ## 装它
@@ -43,12 +46,39 @@ python -m harness.install --check      # 看装没装、装在哪
 python -m harness.install --uninstall  # 撤回
 ```
 
-装完重启 `dsh web`，侧栏就应该从「deepseek / LOCAL BUILD」变成
-「MaixCAM 开发助手 / MaixPy」，多出一个「MaixCAM 知识库」面板入口。
+装两样东西：
 
-它**不改 DeepSeek Harness 本身**：只在 `$DSH_HOME/profiles/<profile>/plugins/` 下放一个包，
-再往那个 profile 的 `cordis.patch.yml` 里插一段带标记的行（含仓库根目录，宿主半边靠它找语料）。
-标记之外的字节一个都不碰，所以别人装在同一个 profile 里的插件不受影响，`--uninstall` 也能干净撤回。
+- **外壳插件** → `$DSH_HOME/profiles/<profile>/plugins/`，并往那个 profile 的
+  `cordis.patch.yml` 里插一段带标记的行（含仓库根目录，宿主半边靠它找语料）；
+- **agent preset** → `$DSH_HOME/.agent-presets/maixcam-assistant/`。
+
+装完重启 `dsh web`：侧栏变成「MaixCAM 开发助手 / MaixPy」，多出「MaixCAM 知识库」面板；
+**新建会话时把 preset 选成「MaixCAM 开发助手」**——只有它才带着检索纪律。
+
+它**不改 DeepSeek Harness 本身**：只是在两个用户级目录里放文件。补丁层的标记之外
+一个字节都不碰，所以别人装在同一个 profile 里的插件不受影响，`--uninstall` 也能干净撤回。
+
+
+## agent 那一侧：一份 preset，改动只有一段话
+
+`harness/maixcam-assistant/agent.cordis.yml` 是随包 `standard` preset 的**副本**
+（`@deepseek-ai/dsh-agent-presets`，MIT），全文件**只改了一处**：`persona` 那一行。
+
+这不是偷懒，而是这一分支最想说明的一件事：**底子是别人的；你在 agent 平面上真正
+要写的，可能只有一段话。** agent 循环、工具系统、沙箱、审批、持久化、模型路由
+全在宿主平面，本来就该是对的；一个领域助手需要改的，是「它被要求怎么回答」。
+
+那段纪律（`persona.prefix`）就是四句话：
+
+| 纪律 | 治的是什么 |
+| --- | --- |
+| **先查再答** —— 回答前先 `search_docs` | 凭记忆编 API |
+| **先核对再用** —— 写 API 名字前先 `lookup_api` | 写出看起来很合理的名字 |
+| **答必带出处** —— 写明文档标题或 URL | 「根据文档」这种无法核对的引用 |
+| **查不到就说不知道** —— 不用合理代码填空 | 用编造的代码把空白填上 |
+
+> 复制而不是从零写，还有一个很实际的理由：**一份复制的组合开箱就是能挂载的。**
+> 从零写的组合通常会忘记某个 group realm，或者把消费者行留在 realm 外面。
 
 ## 检索是怎么接进去的
 
@@ -120,7 +150,7 @@ window.__ModuleLoader__.load({
 })
 ```
 
-## 两个踩过的坑（都是静默失效）
+## 三个踩过的坑（都是静默失效）
 
 ### 1. 「填座位」和「换座位」不是一回事
 
@@ -161,18 +191,42 @@ node harness/tools/eyes.mjs --url <URL> --eval "document.querySelector('.dsh-mx-
 配合 `dsh web --port 0 --no-open`（打印一个带 token 的 URL）就能起一个**只给自己看**的
 验证实例，和用户正在用的那个互不打扰。
 
+### 3. `parameters` 不是 JSON Schema —— 工具会静默消失
+
+`defineTool` 的 `parameters` 是一张**扁平的「参数名 → 规格」表**，必填写在属性自己的
+`required: true` 上：
+
+```js
+parameters: { query: { type: 'string', description: '…', required: true } }
+```
+
+而不是 JSON Schema 的 `{ type: 'object', properties: {…}, required: […] }`。
+写成后者**不报错**，只是让工具静默地不出现在模型的工具表里 ——
+路由照常工作、界面照常工作，只有 agent 看不见它们。
+
+这个坑是**第一次端到端实测**发现的：模型读了人格里的「先调用 `search_docs`」，
+然后说「`search_docs` 不在我的工具列表里」，转而试图用 `python -m maixrag` 去查。
+它甚至自己写了四个探针脚本（我后来清掉了）。
+
+> **教训**：这是本分支第三个「不报错的失败」，而三者都只在**真的跑一遍**时才暴露：
+> 座位优先级要渲染才看得见，工具 schema 要模型真的调一次才知道它没注册，
+> 语料错位要有两次独立构建才撞得上。
+> **"我改完了"和"它生效了"之间，永远隔着一次实跑。**
+
 ## 还没做的
 
 按价值排序，都记在 [`../docs/design/06-项目结构与两条分支.md`](../docs/design/06-项目结构与两条分支.md) §3：
 
-1. **Agent preset：MaixCAM 助手的回答纪律。** 现在两个检索工具注册在宿主平面，
-   对每个会话都可见；但「先查再答、答必带出处、没查到就说不知道」这套纪律还没有
-   落到一份 preset 的提示词段落里。少了它，工具只是"可以调用"，不是"必须调用"。
-2. **`check_api_usage`**：把教学主线那份符号白名单校验（导入别名解析 + 实例类型推断）
+1. **`check_api_usage`**：把教学主线那份符号白名单校验（导入别名解析 + 实例类型推断）
    接到运行期，这样模型写出来的整段代码可以被机器核对，而不是只核对单个符号。
-3. **检索轨迹 / 溯源面板**：`tool.call.toolview` 按工具名派发，可以在会话里就地
+   现在这一环靠 `lookup_api` 逐个查 + 提示词里的自律，是软的。
+2. **检索轨迹 / 溯源面板**：`tool.call.toolview` 按工具名派发，可以在会话里就地
    渲染「这次检索命中了什么」。目前工具结果是一段格式化文本，够读但不够好看。
-4. **稀疏 + 融合 + 重排**：需要先解决 §3.6.1 那个分词器边界（要么把 Python 检索
+3. **稀疏 + 融合 + 重排**：需要先解决 §3.6.1 那个分词器边界（要么把 Python 检索
    做成服务，要么接受一份 JS 分词器）。
-5. **`maixcam` settings 命名空间**：现在配置写在 profile 补丁行里，改一次要重装。
+4. **`maixcam` settings 命名空间**：现在配置写在 profile 补丁行里，改一次要重装。
+5. **preset 瘦身**：现在直接照搬了 `standard` 的全部能力（子代理、工作流、Ralph…）。
+   对一个 MaixCAM 助手，其中一部分是噪音；但删行要连着处理 realm 与消费者，
+   在一份能挂载的副本上「按需增删」比从头裁剪安全得多。
+
 

@@ -14,6 +14,21 @@
  * 这段文本，用户看到的就是「它到底查到了什么」。这是这个应用相对一个裸聊天框的
  * 全部增量，值得为可读性让路。
  *
+ * ## 一个踩过的坑：`parameters` 不是 JSON Schema
+ *
+ * `defineTool` 的 `parameters` 是一张**扁平的「参数名 → 规格」表**，
+ * 必填写在每个属性自己的 `required: true` 上：
+ *
+ * ```js
+ * parameters: { query: { type: 'string', description: '…', required: true } }
+ * ```
+ *
+ * 而不是 JSON Schema 的 `{ type: 'object', properties: {...}, required: [...] }`。
+ * 写成后者**不会报错**，只会让这两个工具静默地不出现在模型的工具表里 ——
+ * 路由照常工作，界面照常工作，只有 agent 看不见工具。
+ * 第一次端到端实测就是这么发现的：模型读了人格里的纪律，然后说
+ * 「`search_docs` 不在我的工具列表里」。
+ *
  * @module dsh-maixcam-shell/tools
  */
 
@@ -80,27 +95,22 @@ export function createCorpusTools(deps) {
 				+ '回答任何关于 MaixCAM / MaixPy 的问题（怎么写代码、某个功能怎么做、报错怎么排查）之前都要先调用它，'
 				+ '并以返回的片段作为唯一依据；没有命中就直说不知道，不要凭记忆补全。',
 			parameters: {
-				type: 'object',
-				properties: {
-					query: {
-						type: 'string',
-						description: '要检索的自然语言问题或关键词，例如「怎么寻找色块」。',
-					},
-					k: {
-						type: 'integer',
-						description: '取几条，默认 6，最多 20。',
-						minimum: 1,
-						maximum: 20,
-					},
+				query: {
+					type: 'string',
+					description: '要检索的自然语言问题或关键词，例如「怎么寻找色块」。',
+					required: true,
 				},
-				required: ['query'],
-				additionalProperties: false,
+				k: {
+					type: 'integer',
+					description: '取几条，默认 6，最多 20。',
+				},
 			},
 			output: { schema: { type: 'json' }, render: (_args, value) => renderHits(value) },
 			timeoutMs: deps.getTimeoutMs(),
 			isConcurrencySafe: () => true,
 			async execute(args) {
-				return deps.search(String(args.query ?? ''), Number(args.k) || 6)
+				const k = Math.min(Math.max(Number(args.k) || 6, 1), 20)
+				return deps.search(String(args.query ?? ''), k)
 			},
 		}),
 
@@ -110,15 +120,11 @@ export function createCorpusTools(deps) {
 				'查一个 MaixPy API 符号的精确签名与所属模块（支持 `camera.AeMode` 这样的限定名，也支持裸名）。'
 				+ '写代码用到某个 API 之前先查一下，用它来核对拼写与参数；返回「没找到」时不要凭印象写出这个名字。',
 			parameters: {
-				type: 'object',
-				properties: {
-					name: {
-						type: 'string',
-						description: '符号名，限定名或裸名，例如 `camera.AeMode` 或 `find_blobs`。',
-					},
+				name: {
+					type: 'string',
+					description: '符号名，限定名或裸名，例如 `camera.AeMode` 或 `find_blobs`。',
+					required: true,
 				},
-				required: ['name'],
-				additionalProperties: false,
 			},
 			output: {
 				schema: { type: 'json' },

@@ -60,6 +60,7 @@ function parseArgs(argv) {
 		width: 1440,
 		height: 900,
 		timeoutMs: 30000,
+		evalTimeoutMs: 30000,
 		settleMs: 900,
 		keep: false,
 	}
@@ -73,6 +74,7 @@ function parseArgs(argv) {
 		else if (a === '--width') opts.width = Number(next())
 		else if (a === '--height') opts.height = Number(next())
 		else if (a === '--timeout') opts.timeoutMs = Number(next())
+		else if (a === '--eval-timeout') opts.evalTimeoutMs = Number(next())
 		else if (a === '--settle') opts.settleMs = Number(next())
 		else if (a === '--text') opts.text = true
 		else if (a === '--keep') opts.keep = true
@@ -129,10 +131,13 @@ function sleep(ms) {
 class Cdp {
 	/**
 	 * @param ws - 已经连上的 WebSocket。
+	 * @param commandTimeoutMs - 单条命令的等待上限。求值一个"等模型答完"的长表达式时
+	 *   必须把它调大，否则会在页面还在跑的时候先超时。
 	 */
-	constructor(ws) {
+	constructor(ws, commandTimeoutMs = 30000) {
 		this.ws = ws
 		this.seq = 0
+		this.commandTimeoutMs = commandTimeoutMs
 		this.pending = new Map()
 		ws.addEventListener('message', (event) => {
 			const msg = JSON.parse(event.data)
@@ -155,12 +160,13 @@ class Cdp {
 	send(method, params = {}) {
 		this.seq += 1
 		const id = this.seq
+		const budget = this.commandTimeoutMs
 		return new Promise((resolve, reject) => {
 			this.pending.set(id, { resolve, reject })
 			this.ws.send(JSON.stringify({ id, method, params }))
 			setTimeout(() => {
-				if (this.pending.delete(id)) reject(new Error(`${method} 超时`))
-			}, 30000)
+				if (this.pending.delete(id)) reject(new Error(`${method} 超过 ${budget}ms 未回`))
+			}, budget)
 		})
 	}
 
@@ -201,7 +207,8 @@ async function main(opts) {
 				'  --wait-for <expr> 轮询到该表达式为真（默认等 body 有内容）',
 				'  --shot <path>     截图写到这里',
 				'  --width/--height  视口尺寸（默认 1440x900）',
-				'  --timeout <ms>    等待上限（默认 30000）',
+				'  --timeout <ms>    页面就绪的等待上限（默认 30000）',
+				'  --eval-timeout <ms> 单条求值的等待上限（默认 30000；等模型答完要调大）',
 				'  --settle <ms>     满足等待条件后再停多久（默认 900，给字体和动画）',
 				'  --keep            收起浏览器后不删用户目录（调试用）',
 			].join('\n'),
@@ -250,7 +257,7 @@ async function main(opts) {
 			ws.addEventListener('error', () => rej(new Error('连 DevTools 失败')), { once: true })
 		})
 
-		const cdp = new Cdp(ws)
+		const cdp = new Cdp(ws, opts.evalTimeoutMs)
 		await cdp.send('Runtime.enable')
 		await cdp.send('Page.enable')
 
