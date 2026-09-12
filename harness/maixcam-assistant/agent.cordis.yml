@@ -160,6 +160,11 @@
 # carries whatever the deployment registered globally (repository plugins).
 - id: skill-filesystem
   name: '@deepseek-ai/dsh-skill-filesystem'
+  config:
+    # 应用自带的 skill 目录。检索的**迭代纪律**写在这里（maixcam/skills/maixcam-kb/SKILL.md），
+    # 而不是塞进检索工具里 —— 循环是 agent 的事，一个工具调用不可能知道 agent 看完成果后还缺什么。
+    customSkillDirs:
+      - 'C:/Users/chuan/maixcam-assistant/maixcam/skills'
 
 - id: tool-skill
   name: '@deepseek-ai/dsh-tool-skill'
