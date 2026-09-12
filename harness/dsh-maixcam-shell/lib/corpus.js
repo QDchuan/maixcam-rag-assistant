@@ -245,6 +245,36 @@ export function loadCorpus({ root }) {
 		 * （那是 Python 侧分词器的派生物，见 `bm25.js` 顶部）。
 		 */
 		bm25: buildBm25(chunks),
+		/**
+		 * 子系统词表：token → 它出现在哪几篇文档的标题里。
+		 *
+		 * 这是**前置语义扩展**的燃料。实测的病：问「设计一个二维云台人脸跟随系统」，
+		 * 检索把「人脸追踪2轴云台」那一页端上来就停了 —— 而**那一页自己就提到了**
+		 * PWM、串口、引脚。关联不在向量里，在**已经命中的那篇文档的正文里**。
+		 *
+		 * 所以扩展不需要再叫一次大模型：把命中片段的正文，拿去和这个「文档标题词表」
+		 * 对一遍，命中的其它文档标题就是**这篇还牵扯到的子系统**。
+		 * 全库的文档标题只有一百多条，比对是常数级开销。
+		 */
+		facetVocab: (() => {
+			const vocab = new Map()
+			const byDoc = new Map()
+			for (const chunk of chunks) {
+				const id = chunk.doc_id
+				if (!byDoc.has(id)) byDoc.set(id, { title: chunk.meta?.doc_title ?? id, docIds: new Set() })
+				byDoc.get(id).docIds.add(id)
+			}
+			for (const [id, entry] of byDoc) {
+				for (const token of new Set(tokenize(entry.title))) {
+					// 太短的 token 噪声大（中文单字、`api` 之类），丢掉。
+					if (token.length < 2) continue
+					const cur = vocab.get(token)
+					if (cur === undefined) vocab.set(token, { title: entry.title, docIds: new Set([id]) })
+					else cur.docIds.add(id)
+				}
+			}
+			return vocab
+		})(),
 		stats: {
 			chunks: chunks.length,
 			dim: cols,
@@ -435,4 +465,63 @@ export function lookupSymbol(corpus, name) {
 		candidates,
 		inRoster: corpus.roster.includes(key),
 	}
+}
+
+/**
+ * 前置语义扩展：从**已命中的片段**里，找出这篇文档还牵扯到哪些别的子系统。
+ *
+ * ## 为什么是这样做的
+ *
+ * 用户的诊断是对的：「向量匹配，匹配不出来跟人脸识别相关的比如说舵机那些东西，
+ * 但是大模型就可以想到它们之间的关联」。而实测那句话在两处成立：
+ *
+ * 1. 「人脸追踪2轴云台」那一页的正文里**本来就有** `PWM`、`串口`、`引脚` 这些词；
+ * 2. 检索只取前 k 条**同一页**的切片，于是这些词从没离开过那一页的上下文。
+ *
+ * 所以不需要额外叫一次大模型 —— 关联就在**已经拿到手的文本**里，
+ * 缺的只是「把这篇提到的其它主题名拿去再查一遍」这一步。
+ *
+ * 这是确定性的、零额外延迟的做法；模型那一路（`aspects`）仍然保留，
+ * 两者是互补的：模型负责它自己的联想，这里负责**文档自己交代过的关联**。
+ *
+ * @param corpus - 语料句柄。
+ * @param evidence - 本次已命中的证据。
+ * @param limit - 最多返回几个关联子系统。
+ * @returns `[{ docId, title, n, tokens }]`，按关联强度降序。
+ */
+/**
+ * ⚠️ **当前未接入检索路径** —— 实测精度不够，见下。
+ *
+ * 在一份 119 篇文档的语料上实测（Q: 设计一个二维云台人脸跟随系统）：
+ * 它没有找出 PWM / 串口 / 引脚，反而返回了「模型获取、上板和运行」「关键词识别」
+ * 这类伪关联 —— 根因是用**文档标题的词**做关联词表，中文切二元组之后
+ * 「关键」「检测」这种字面重合会到处命中。
+ *
+ * 还有一个更根本的限制：扩展只能看见**已经取到手的那几段**提到的东西，
+ * 而这次命中的是「简介 / 常见问题」，正文里没有 PWM。
+ *
+ * 结论：方向对（关联在文档正文里，不在向量里），但判据不能是标题词面重合。
+ * 要让它成立，关联词应当来自**文档正文里的 API 符号与模块名**（我们有
+ * api_symbols.jsonl 的 1898 个符号 + 70 个模块，那是结构化的、不是字面撞的）。
+ * 在那之前不接线 —— 不能为了「有扩展」而把噪声和每次 4 次额外嵌入塞进检索路径。
+ */
+export function expandFacets(corpus, evidence, limit = 4) {
+	const text = evidence.map((e) => e.text ?? '').join('\n').toLowerCase()
+	if (text === '') return []
+
+	const hitDocs = new Set(evidence.map((e) => e.doc_id))
+	const found = new Map()
+
+	for (const [token, entry] of corpus.facetVocab) {
+		if (!text.includes(token)) continue
+		for (const docId of entry.docIds) {
+			if (hitDocs.has(docId)) continue
+			const cur = found.get(docId) ?? { docId, title: entry.title, n: 0, tokens: [] }
+			cur.n += 1
+			if (cur.tokens.length < 4) cur.tokens.push(token)
+			found.set(docId, cur)
+		}
+	}
+
+	return [...found.values()].sort((a, b) => b.n - a.n).slice(0, limit)
 }

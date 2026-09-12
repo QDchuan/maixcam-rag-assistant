@@ -246,6 +246,7 @@ export function apply(ctx, config) {
 
 		if (aspects.length === 0) {
 			const { hits, embedMs } = await hybrid(c, query, k)
+
 			return {
 				query,
 				k,

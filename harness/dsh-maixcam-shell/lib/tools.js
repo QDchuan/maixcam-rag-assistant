@@ -132,6 +132,7 @@ function renderHits(result) {
 		)
 	}
 
+
 	const lines = result.hits.map((hit, i) => {
 		const where = [hit.doc_title || hit.doc_id, ...(hit.heading_path ?? [])]
 			.filter((s) => s && s !== '(开头)')
