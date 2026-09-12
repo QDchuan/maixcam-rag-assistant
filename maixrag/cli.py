@@ -770,8 +770,32 @@ def main_demo(argv: list[str] | None = None) -> int:
     - **不给参数 = 交互模式**，因为"打开它"最自然的期待就是"我要开始问了"；
     - **第一个参数是已知子命令时不注入 `demo`**，所以 `maixcam_agent eval --help`
       也能用（否则会变成 `demo eval --help`，报一个看不懂的错）。
+
+    第三个细节是**工作目录**，它是这个命令装成全局之后才暴露出来的问题：
+    `cli.py` 里所有路径都从 `Path.cwd()` 算起（`Config.load(project_root=...)`），
+    这在"`cd` 到仓库再跑"时是对的，但全局命令**从任何目录都能启动**——
+
+        在 C:\\Users\\chuan 下敲 maixcam_agent
+        → 它去找 C:\\Users\\chuan\\corpus\\processed\\chunks.jsonl
+        → 报"找不到，请先运行 maixrag corpus build"
+
+    而语料在仓库里，不在用户的家目录。所以入口先把工作目录切到仓库根
+    （由包自己的位置推出，editable 安装下 `cli.py` 就在仓库里）。
+
+    **这个切换是刻意的、也应当被知道**：本项目的语料、索引、配置、评测产物
+    全都在仓库里，这个命令就是"这个项目的命令"，它理应在项目目录下运行。
     """
     import sys as _sys
+
+    # 先切到仓库根。理由见上面的 docstring：全局命令从任何目录都能启动，
+    # 而语料/索引/配置/产物全在仓库里。
+    import os
+    repo = Path(__file__).resolve().parents[1]
+    try:
+        if repo.is_dir() and Path.cwd() != repo:
+            os.chdir(repo)
+    except OSError:
+        pass          # 切不过去就照旧用 cwd，让下游报它自己的错
 
     args = list(argv) if argv is not None else _sys.argv[1:]
     if not args or args[0].startswith("-"):
