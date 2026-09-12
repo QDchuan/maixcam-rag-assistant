@@ -1,0 +1,14 @@
+# Bundle 层：让这个包可以用 `dsh plugin --profile <name> add dsh-maixcam-shell`
+# 装进一个 dsh profile。
+#
+# 一条 `insert` 挂在 profile 根上：装包会把包名加进 profile 的
+# `dsh.profile.bundles`，这一行负责把**宿主半边**挂起来。
+# 浏览器半边不需要自己的行 —— 它通过 package.json 里的 `dsh.client` 声明到达。
+#
+# 这个包没有配置项：壳体目前只占座位，不给用户任何需要填的东西。
+# 等检索接入点落地后，可调项会走 `maixcam` settings 命名空间，而不是写在这里 ——
+# 同一个值写在两处只会互相打架。
+
+- insert:
+    - id: maixcam-shell
+      name: dsh-maixcam-shell
