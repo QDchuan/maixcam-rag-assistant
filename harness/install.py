@@ -42,6 +42,9 @@ END = f"# <<< {PACKAGE} <<<"
 #: 包源目录：本文件所在目录下的同名子目录。
 SOURCE = Path(__file__).resolve().parent / PACKAGE
 
+#: 仓库根目录：`harness/` 的上一级。语料产物在它下面，宿主半边要按绝对路径去找。
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
 #: 复制时要跳过的名字。
 SKIP_NAMES = {"__pycache__", "node_modules", ".git"}
 
@@ -59,13 +62,19 @@ def profile_dir(profile: str) -> Path:
     return dsh_home() / "profiles" / profile
 
 
-def block() -> str:
-    """返回要插进 `cordis.patch.yml` 的那一段（含标记，末尾带换行）。"""
+def block(repo_root: Path) -> str:
+    """返回要插进 `cordis.patch.yml` 的那一段（含标记，末尾带换行）。
+
+    仓库根目录用 YAML 单引号标量写进去：单引号里的反斜杠是字面量，
+    Windows 路径不用转义，中文路径也照原样带着。
+    """
     return (
         f"{BEGIN}\n"
         f"- insert:\n"
         f"    - id: {ROW_ID}\n"
         f"      name: '{ENTRY}'\n"
+        f"      config:\n"
+        f"        repoRoot: '{repo_root}'\n"
         f"{END}\n"
     )
 
@@ -180,10 +189,11 @@ def cmd_install(profile: str, dry_run: bool) -> int:
         print(f"  {line}")
 
     before = read_patch(patch)
-    after, action = splice(before, block())
+    after, action = splice(before, block(REPO_ROOT))
     if action != "unchanged" and not dry_run:
         patch.write_text(after, encoding="utf-8")
     print(f"  patch: {action}")
+    print(f"  语料根：{REPO_ROOT}")
 
     print()
     print("装好了。重启 dsh web（或等 profile 补丁层热重载），侧栏应显示 MaixCAM 品牌。")
