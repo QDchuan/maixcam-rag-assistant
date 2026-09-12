@@ -77,7 +77,7 @@ RAG 与 agent 工程里最难的部分，不是把东西搭起来，而是**东�
 
 ## 课后习题
 
-读完六篇之后，试着做这几道（答案在 [`docs/exercises/answers.md`](../exercises/answers.md)）：
+读完六篇之后，试着做这几道（答案在 [`docs/exercises/answers.md`](../exercises/)）：
 
 **B1（诊断）** 你在自己的 RAG 项目里发现：某个问题的答案明显有依据，
 但你的评测报告说"召回率 0"。列出三种可能的原因，并说明怎么逐一排除。

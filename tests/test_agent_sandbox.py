@@ -234,8 +234,49 @@ def test_capability_can_require_approval(tmp_path):
         approver=AlwaysApprove(),
     )
     d = p.check(_net_tool(), {"url": "https://x"})
+    # 有审批人且批准了 -> 应当放行
+    assert d.allowed is True, "有可用审批人且批准时，应当放行而不是拒绝"
+    assert "批准" in d.reason
+
+
+def test_capability_needing_approval_is_denied_without_approver():
+    """同一个策略，只把审批人换掉，结果必须不同。
+
+    **这条测试来自一个真实的 bug**：能力层曾经直接返回"拒绝 + 需要审批"，
+    从不调用 approver。于是 AlwaysApprove 与"没有审批人"的结果完全一样——
+    审批通道对能力审批这个最重要的场景是死的，而且状态标记看起来都对，
+    所以从报告上看不出任何异常。
+
+    防这类 bug 的办法就是**成对断言**：同一个输入，只改一个变量，
+    两个结果的**行为**必须不同。
+    """
+    with_approver = SandboxPolicy(
+        allowed={Capability.PURE}, needs_approval={Capability.NET},
+        approver=AlwaysApprove(),
+    )
+    without_approver = SandboxPolicy(
+        allowed={Capability.PURE}, needs_approval={Capability.NET},
+        # 默认就是 DenyApprovalUnavailable
+    )
+
+    a = with_approver.check(_net_tool(), {"url": "https://x"})
+    b = without_approver.check(_net_tool(), {"url": "https://x"})
+
+    assert a.allowed is True
+    assert b.allowed is False
+    assert a.allowed != b.allowed, \
+        "换掉审批人却没改变结果，说明审批人根本没被调用"
+
+
+def test_denied_capability_is_not_confused_with_needing_approval():
+    """"不允许"与"需要审批"是两种不同的拒绝，用途不同。
+
+    前者重试无用；后者可以由上层拿去申请审批。
+    """
+    p = SandboxPolicy(allowed={Capability.PURE})  # NET 既不允许也不在审批名单
+    d = p.check(_net_tool(), {"url": "https://x"})
     assert d.allowed is False
-    assert d.needs_approval is True, "应当标记为「可申请审批」，而不是直接拒绝"
+    assert d.needs_approval is False, "不在审批名单里的能力，不该标记为可申请审批"
 
 
 def test_no_approver_means_denied():

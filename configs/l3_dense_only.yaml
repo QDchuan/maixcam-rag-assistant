@@ -1,0 +1,46 @@
+# 消融用：与 l2_hybrid 完全一致，但只保留 dense 检索器。
+#
+# 用法：
+#   python -m maixrag --config configs/l3_dense_only.yaml index build
+#   python -m maixrag --config configs/l3_dense_only.yaml eval --level rag --fake-chat
+#
+# 注意：--fake-chat 只替换对话模型，嵌入仍是真的（检索轴不需要对话模型）。
+
+corpus:
+  version: "main"
+  sources: [repo, api]
+  pin: true
+  repo_mode: archive
+
+chunking:
+  strategy: heading
+  max_tokens: 500
+  min_tokens: 80
+  overlap_tokens: 80
+  contextual_header: false
+
+index:
+  embedding:
+    provider: openai_compatible
+    base_url: "${EMBED_BASE_URL}"
+    model: "${EMBED_MODEL}"
+    api_key: "${EMBED_API_KEY}"
+  sparse:
+    enabled: true
+
+retrieval:
+  mode: retrieve
+  retrievers: [dense]
+  fusion: rrf
+  top_k: 5
+
+generation:
+  model: "${CHAT_MODEL}"
+  base_url: "${CHAT_BASE_URL}"
+  api_key: "${CHAT_API_KEY}"
+  citation_required: true
+  symbol_check: true
+  context_strategy: retrieved
+
+agent:
+  enabled: false

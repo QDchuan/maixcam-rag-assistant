@@ -167,9 +167,22 @@ class SandboxPolicy:
         # --- 第 1 层：能力边界 ---
         for cap in sorted(tool.requires):
             if cap in self.needs_approval:
+                # **必须真的去问审批人，而不是直接拒绝。**
+                #
+                # 这里曾经有个 bug：能力层直接返回"拒绝 + 需要审批"，
+                # 从不调用 approver。后果是 AlwaysApprove 与"没有审批人"
+                # 给出的结果完全一样——审批通道对这个最重要的场景是死的，
+                # 而且看起来一切正常（都返回 allowed=False，都标记 needs_approval）。
+                #
+                # 这类 bug 特别隐蔽：状态标记是对的，只有"有没有真的问过"
+                # 这件事是错的，而报告只显示状态标记。
+                if self.approver.request(tool, args, f"能力 {cap} 需要人工审批"):
+                    return PermissionDecision(
+                        allowed=True, reason=f"能力 {cap} 已获人工批准",
+                    )
                 return PermissionDecision(
                     allowed=False, needs_approval=True,
-                    reason=f"能力 {cap} 需要人工审批",
+                    reason=f"能力 {cap} 需要人工审批（审批未通过）",
                 )
             if cap not in self.allowed:
                 return PermissionDecision(

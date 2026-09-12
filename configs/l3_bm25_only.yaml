@@ -1,0 +1,46 @@
+# 消融用：与 l2_hybrid 完全一致，但只保留 bm25 检索器。
+#
+# 用法：
+#   python -m maixrag --config configs/l3_bm25_only.yaml index build
+#   python -m maixrag --config configs/l3_bm25_only.yaml eval --level rag --fake
+#
+# --fake 在这里是安全的：BM25 与嵌入无关，检索轴完全由词面匹配决定。
+
+corpus:
+  version: "main"
+  sources: [repo, api]
+  pin: true
+  repo_mode: archive
+
+chunking:
+  strategy: heading
+  max_tokens: 500
+  min_tokens: 80
+  overlap_tokens: 80
+  contextual_header: false
+
+index:
+  embedding:
+    provider: openai_compatible
+    base_url: "${EMBED_BASE_URL}"
+    model: "${EMBED_MODEL}"
+    api_key: "${EMBED_API_KEY}"
+  sparse:
+    enabled: true
+
+retrieval:
+  mode: retrieve
+  retrievers: [bm25]
+  fusion: rrf
+  top_k: 5
+
+generation:
+  model: "${CHAT_MODEL}"
+  base_url: "${CHAT_BASE_URL}"
+  api_key: "${CHAT_API_KEY}"
+  citation_required: true
+  symbol_check: true
+  context_strategy: retrieved
+
+agent:
+  enabled: false

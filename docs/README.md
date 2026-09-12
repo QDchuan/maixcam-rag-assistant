@@ -132,7 +132,7 @@ python scripts/demo_sandbox.py    # 安全错：权限越界，"拦住了≠拦�
 
 每一章都有习题，分四组：**复现 / 诊断 / 改造 / 判断**。
 
-参考答案在 [`docs/exercises/answers.md`](./exercises/answers.md)（待写）。
+参考答案在 [`docs/exercises/answers.md`](./exercises/)（待写）。
 
 **C 组（改造）是核心**：它逼你先写下预测，再验证。
 "预测错了"恰恰是最有价值的学习时刻——而绝大多数教学文档不给你犯错的机会。
