@@ -386,9 +386,127 @@ def cmd_agent_eval(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_demo(args: argparse.Namespace) -> int:
+    """终端演示：把 agent 的执行过程实时画出来。
+
+    **这个函数本身就是「可插拔」的证明。**
+
+    它没有改 agent 的任何一行代码——只是往注册表上多挂了一个插件
+    （`TuiPlugin`），系统就从"看不见过程"变成了"看得见过程"。
+    想验证这句话，把这个函数里 `app.scope.mount(TuiPlugin(...))` 那三行注释掉：
+    agent 照常回答问题，只是安静地答，一个字都不用改。
+
+    它同时也是**面试演示**：前 3 秒有一个像样的启动画面，
+    中间能看到"它先查了什么、为什么改主意"，
+    结尾给出联系方式——而启动画面上每一个数字都来自实际装配结果，
+    不是写死的标语。
+    """
+    from .agent.app import AgentProfile, agent_stats
+    from .agent.tui import (
+        CONTACT, TerminalPresenter, TuiPlugin, banner, build_banner_stats,
+        color_wanted, disable_color, ensure_ansi,
+    )
+
+    ensure_ansi()
+    if not color_wanted(force=False if args.no_color else None):
+        disable_color()
+
+    # `--list` 在装配之前就返回：**列问题不该要求先能跑起来。**
+    # 否则"我还没配密钥，想先看看能问什么"这个最合理的用法会直接失败。
+    questions = list(args.question or [])
+    if args.list and not questions:
+        from .agent.tui import C_ACCENT, C_DIM, RESET
+
+        print(f"\n{C_DIM}  示例问题（当参数传进去，或进交互模式自己问）{RESET}\n")
+        for q in DEMO_QUESTIONS:
+            print(f"    {C_ACCENT}·{RESET} {q}")
+        print()
+        print(f"{C_DIM}  python -m maixrag demo --fake-chat "
+              f"\"{DEMO_QUESTIONS[3]}\"{RESET}\n")
+        return 0
+
+    cfg = Config.load(args.config, project_root=Path.cwd())
+    app = _build_main_branch_agent(cfg, args)
+
+    # 把呈现层作为插件挂进一个**隔离域**。
+    #
+    # 为什么是隔离域而不是全局平面：呈现器天然是"每个终端一份"的。
+    # 两个终端各挂一份，如果都往全局注册 `presenter`，第二个就会撞名——
+    # 这正是本项目里「发布服务的行不能裸放在会话级组合里」那条规则的由来。
+    presenter = TerminalPresenter(stream=not args.no_stream)
+    app.scope.mount(TuiPlugin(presenter), isolate=True)
+
+    print(banner(build_banner_stats(app)))
+
+    if args.show_architecture:
+        print(app.registry.describe())
+        print()
+
+    profile = AgentProfile(app=app)
+
+    if questions:
+        for q in questions:
+            _demo_turn(app, presenter, profile, q)
+    elif not sys.stdin.isatty():
+        # 被管道喂入时逐行读，方便脚本化演示与回归
+        for line in sys.stdin:
+            q = line.strip()
+            if q:
+                _demo_turn(app, presenter, profile, q)
+    else:
+        _demo_repl(app, presenter, profile)
+
+    presenter.show_footer(agent_stats(app))
+    print(f"\n  联系方式  {CONTACT}\n")
+    return 0
+
+
+def _demo_repl(app, presenter, profile) -> None:
+    """交互模式。空行、`exit`、`quit`、Ctrl-C、EOF 都能退出。"""
+    from .agent.tui import C_ACCENT, C_DIM, RESET
+
+    print(f"{C_DIM}  输入问题开始（直接回车或 exit 退出）。"
+          f"想看示例问题加 --list。{RESET}\n")
+    while True:
+        try:
+            q = input(f"{C_ACCENT}你 › {RESET}").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return
+        if not q or q.lower() in ("exit", "quit", ":q"):
+            return
+        _demo_turn(app, presenter, profile, q)
+
+
+def _demo_turn(app, presenter, profile, question: str) -> None:
+    """问一次，并把实时事件交给呈现器。
+
+    **注意这里没有任何"打印轨迹"的代码。** 轨迹是插件订阅事件后自己画的——
+    所以换成 JSON 输出、Web 面板、日志文件都不需要动这一行。
+    """
+    import time
+
+    presenter.show_question(question)
+    t0 = time.perf_counter()
+    ans = profile.answer(question)
+    presenter.show_answer(ans.text, ans.citations, time.perf_counter() - t0)
+    if ans.refused:
+        from .agent.tui import C_WARN, RESET
+
+        print(f"{C_WARN}  [已拒答] {ans.refusal_reason or '资料未覆盖'}{RESET}")
+
+
+DEMO_QUESTIONS = [
+    "maix.camera.Camera 的构造函数有哪些参数？",
+    "MaixCAM 上怎么用摄像头拍一张图并显示到屏幕上？",
+    "MaixPy 里怎么找色块？用什么函数的什么参数？",
+    "MaixCAM 的 GPIO 怎么用？怎么点灯？",
+    "MaixCAM 上怎么跑大语言模型？需要先下载模型吗？",
+]
+
+
 def _avg_tool_calls(report, app) -> str:
     """平均每题的**工具调用数**（不是轮次）。
-
     **必须读累计计数，不能读 `tools.history`**——单题评测时 history 会被
     逐题清空，从它读会把"18 题的统计"变成"最后一题的统计"。
     这个 bug 出现过两次（一次在 agent_stats，一次在这里），
@@ -481,6 +599,22 @@ def build_parser() -> argparse.ArgumentParser:
     ae.add_argument("--fake-embed", action="store_true")
     ae.add_argument("--fake-chat", action="store_true")
     ae.set_defaults(func=cmd_agent_eval)
+
+    # ---- 终端演示（面试 / 展示用）----
+    dm = sub.add_parser("demo", help="终端演示：把 agent 的执行过程实时画出来")
+    dm.add_argument("question", nargs="*",
+                    help="要问的问题；不给就进交互模式")
+    dm.add_argument("--list", action="store_true", help="只列示例问题，不运行")
+    dm.add_argument("--no-color", action="store_true", help="关掉颜色")
+    dm.add_argument("--no-stream", action="store_true", help="关掉打字机效果")
+    dm.add_argument("--show-architecture", action="store_true",
+                    help="先打印注册表：谁提供了什么、在哪个平面")
+    dm.add_argument("--max-turns", type=int, default=0)
+    dm.add_argument("--max-tool-calls", type=int, default=0)
+    dm.add_argument("--fake-embed", action="store_true")
+    dm.add_argument("--fake-chat", action="store_true",
+                    help="用假的决策模型，完全不联网（演示与录屏都用它）")
+    dm.set_defaults(func=cmd_demo)
     return p
 
 

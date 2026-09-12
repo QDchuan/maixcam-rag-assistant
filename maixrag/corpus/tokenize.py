@@ -19,10 +19,17 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from functools import lru_cache
 
 import jieba
+
+# jieba 首次初始化会往 stderr 打三行 "Building prefix dict / Loading model …"。
+# 对一个**演示程序**来说这是致命的：启动画面第一眼就被日志糊住了。
+# 它只是进度信息，不是警告，所以压到 ERROR 而不是屏蔽整个 logger——
+# 真有异常时仍然看得见。
+jieba.setLogLevel(logging.ERROR)
 
 # 标识符：允许点分（maix.image.Image）、下划线、数字
 _IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*")

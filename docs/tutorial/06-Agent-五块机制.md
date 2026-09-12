@@ -324,7 +324,7 @@ python -m maixrag --config configs/l2_hybrid.yaml ask "MaixPy 里怎么做 YOLO 
 ## 相关
 
 - 上一章：[05 提示词装配](./05-评测.md)
-- 下一章：[07 端到端评测](./07-端到端.md)
+- 下一章：[07 端到端评测](./07-端到端.md) · [08 终端演示](./08-终端演示.md)
 - 概念：[06 Agent 与链的区别](../concepts/06-Agent与链的区别.md) ·
   [08 权限与沙盒](../concepts/08-权限与沙盒.md)
 - 事故：[06 预算与任务不匹配](../postmortem/06-预算与任务不匹配.md) ·

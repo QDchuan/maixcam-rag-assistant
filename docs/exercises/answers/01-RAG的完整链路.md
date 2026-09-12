@@ -36,7 +36,7 @@
 "已经进 Top-K 的片段里有多少真相关"——它只在**已召回的那部分**里算，天花板再低它也可能很漂亮；
 延迟衡量的是"这次请求多慢"，是逐次与累计成本，跟"资料有没有到模型眼前"无关。
 用一个具体数字看：本项目链式基线的报告里 `Recall@K = 0.611`
-（[`eval/results/rag_L1_rag[rrf_dense+bm25].md`](<../../eval/results/rag_L1_rag[rrf_dense+bm25].md>)），
+（[`eval/results/rag_L1_rag[rrf_dense+bm25].md`](<../../../eval/results/rag_L1_rag[rrf_dense+bm25].md>)），
 意思是每道题标注的"必须被召回的页面"里，大约 39% **从来没有出现在模型眼前**——
 这部分不是提示词、模型或校验能补的，因为它们连输入都没有。这就是"主指标"的含义：
 它不是一个分数排名里的第一名，而是**结构性上限**。
@@ -75,7 +75,7 @@ API chunk 与教程散文在同一个池子里竞争。API chunk 对"函数签�
 "分母为 0 时返回 0.0"——**它把"没有证据"和"证据表明没问题"编码成了同一个数字**。
 至少两种什么都没测到的情况：
 1. **分母本身就是 0**：模型压根没输出代码（本项目第一次就是这样——模型拿不到 API 资料，
-   按纪律不写代码，于是没有符号可检查）。[`scripts/inspect_eval.py`](../../scripts/inspect_eval.py) 打出的正是
+   按纪律不写代码，于是没有符号可检查）。[`scripts/inspect_eval.py`](../../../scripts/inspect_eval.py) 打出的正是
    `符号被检查到的题数 0/18 (0%)`；
 2. **只有个别题贡献了分母、其余全没测到**：比如 18 题里只有 1 题写了代码，
    这 1 题又刚好没错，0.000 就成了"18 题都没问题"的假象；
@@ -101,8 +101,8 @@ API chunk 与教程散文在同一个池子里竞争。API chunk 对"函数签�
 
 1. **先对齐口径，再比数字。** 两份报告必须同语料、同评测集、同 K、同嵌入模型，
    否则差异不来自被测变量。本项目这两份报告的唯一差别就是 `retrieval.retrievers`
-   （`[dense]` 对 `[dense, bm25]`），配置见 [`configs/l3_dense_only.yaml`](../../configs/l3_dense_only.yaml)
-   与 [`configs/l2_hybrid.yaml`](../../configs/l2_hybrid.yaml)，所以差别可以归因到第 ⑤ 环的融合。
+   （`[dense]` 对 `[dense, bm25]`），配置见 [`configs/l3_dense_only.yaml`](../../../configs/l3_dense_only.yaml)
+   与 [`configs/l2_hybrid.yaml`](../../../configs/l2_hybrid.yaml)，所以差别可以归因到第 ⑤ 环的融合。
 2. **按环节的顺序逐环排除，而不是跳到最贵的那一环。** 语料→索引→切分→检索→融合，
    每环的故障形态不同：语料是"索引里根本没有这个 doc_id"（[事故 02](../../postmortem/02-有文档却召不回.md)），
    检索是"候选池里有、但排序不对"，融合是"候选池里有、两路各自都排得不错、合起来反而掉出 Top-K"。
@@ -119,7 +119,7 @@ API chunk 与教程散文在同一个池子里竞争。API chunk 对"函数签�
 `concept` 0.500 → 0.500、`signature` 0.500 → 0.500、`troubleshoot` 0.500 → 1.000，
 而 `example` 从 **1.000 掉到 0.750**——融合把一整个 `example` 题（`q005`，YOLO 例程，标注文档就是
 `zh/vision/yolov5`）从 dense 的第 5 名挤出了 Top-5。机制在
-[`maixrag/retrieval.py`](../../maixrag/retrieval.py)：两路先各取 20 个候选，再按
+[`maixrag/retrieval.py`](../../../maixrag/retrieval.py)：两路先各取 20 个候选，再按
 `score(d) = Σ_r 1/(rrf_k + rank_r(d))` 重排取前 5；`zh/vision/yolov5` 在 dense 排第 5（贡献约 1/66）、
 在 BM25 排第 6（贡献约 1/67，两路合计约 0.030），而两路都排 10–20 名的片段各自拿到约两份
 1/7x 的分数（合计约 0.05–0.06），叠加后反超了它——**单路已经进榜的片段，融合可以把它挤出去**
@@ -159,11 +159,11 @@ API chunk 与教程散文在同一个池子里竞争。API chunk 对"函数签�
 **一个示范回答**：
 
 判断顺序是**先看分母、再看代价，最后才动 K**。第一步查"这个 doc_id 在索引里存在吗"：
-`signature` 类曾经是 0.000（[`eval/results/rag_L1_rag[rrf_bm25].md`](<../../eval/results/rag_L1_rag[rrf_bm25].md>)
+`signature` 类曾经是 0.000（[`eval/results/rag_L1_rag[rrf_bm25].md`](<../../../eval/results/rag_L1_rag[rrf_bm25].md>)
 里 `signature | 4 | 0.000 | 0.000`），根因是 API 参考页**没产出任何 chunk**——
 这种时候把 top_k 从 5 调到 50，"什么都不会发生，因为索引里没有东西可检索"
 （[concepts 01 · 误解一](../concepts/01-RAG的完整链路.md)）。修完语料层之后，
-同一个 `signature` 行变成 **0.500**（[`eval/results/rag_L1_rag[rrf_dense+bm25].md`](<../../eval/results/rag_L1_rag[rrf_dense+bm25].md>)），
+同一个 `signature` 行变成 **0.500**（[`eval/results/rag_L1_rag[rrf_dense+bm25].md`](<../../../eval/results/rag_L1_rag[rrf_dense+bm25].md>)），
 而这一涨**没动一行检索代码、也没动 K**。反过来说，K 真正有用的场景是"已经在候选池里、只是排在第 6–20 名"：
 本项目 `zh/vision/yolov5` 在只跑 dense 时正好是**第 5 名**——它是踩着线进来的，
 任何一个把名次往后推一点点的改动都会让它掉出去，这时扩大 K 或调整融合都有真实作用。
@@ -198,7 +198,7 @@ API chunk 与教程散文在同一个池子里竞争。API chunk 对"函数签�
 我会给**每一个比率型指标配一个覆盖计数字段**，字段形如 `checked_items / total_items`
 （对符号幻觉就是"符号被检查到的题数"）。理由是它把 0.000 劈成两种互斥解释，
 而这个区分只能用分母做：本项目真实发生过的一次是
-`符号被检查到的题数 0/18 (0%)`（[`scripts/inspect_eval.py`](../../scripts/inspect_eval.py) 的输出），
+`符号被检查到的题数 0/18 (0%)`（[`scripts/inspect_eval.py`](../../../scripts/inspect_eval.py) 的输出），
 修完检索之后覆盖率变成 **18/18**，同一个 0.000 才是真的
 （[事故 05](../../postmortem/05-伪装成好消息的0.md)）。
 代价与边界也要说清：这个字段只暴露"测了多少"，**不保证标注本身是对的**——
@@ -258,7 +258,7 @@ python scripts/inspect_eval.py
 3. 名次层面的现场：`python scripts/demo_retrieval.py --query "MaixPy 里怎么做 YOLO 物体检测？给出一个完整例程。" -k 20`
    会把同一查询在三个检索器下的名次打出来——**dense 第 5 / bm25 第 6 / 融合掉到第 12**。
    注意 bm25 不是"没找到"，是**排在第 6、刚好在 Top-5 之外**；而融合后再退到第 12，
-   连扩大 K 到 12 才能勉强看到它。机制在 [`maixrag/retrieval.py`](../../maixrag/retrieval.py)：
+   连扩大 K 到 12 才能勉强看到它。机制在 [`maixrag/retrieval.py`](../../../maixrag/retrieval.py)：
    `HybridRetriever` 让两路各取 **20** 个候选（`pool = max(k, 20)`），再用
    `1/(60 + rank + 1)` 累加后取前 **5**。它排 dense 第 5（贡献约 1/66）、bm25 第 6
    （贡献约 1/67，两路合计约 0.030）；而两路都在 10–20 名的片段各自拿到约两份 1/7x 的分数
@@ -271,7 +271,7 @@ python scripts/inspect_eval.py
 建议先备份，或换一份配置文件名。**这两个数字我没有亲手重跑确认**，
 它们是 `eval/results/` 里现成报告的值——**其余数字同样以你机器上的输出为准**。
 （名次那一组来自 [tutorial 04 · 4.2 / R2](../../tutorial/04-检索与消融.md) 与
-[`scripts/demo_retrieval.py`](../../scripts/demo_retrieval.py)，我也未亲自重跑。）
+[`scripts/demo_retrieval.py`](../../../scripts/demo_retrieval.py)，我也未亲自重跑。）
 
 ### H2. 把评测的 K 从 5 改成 50，先写下预测再跑
 
@@ -299,6 +299,6 @@ python -m maixrag --config configs/l2_hybrid.yaml eval --level rag --fake-chat -
 **我未实测的部分**：`--top-k 50` 这一次的 Recall / Context Precision 具体数值、
 以及它是否会覆盖你现有的报告文件，**[未实测，需你运行确认]**。
 上面对**方向**的判断来自评测器的实现
-（[`maixrag/evaluation/harness.py`](../../maixrag/evaluation/harness.py) 的 `evaluate_retrieval`：
+（[`maixrag/evaluation/harness.py`](../../../maixrag/evaluation/harness.py) 的 `evaluate_retrieval`：
 `top = hits[:k]`，召回按 `required_docs` 在 `top` 中的命中比例算），
 以及现成报告里 K=5 时的实测值（Recall@5 **0.611** / Context Precision **0.267**）。

@@ -196,6 +196,40 @@ class AgentLoop:
         self._budget_limits = budget or Budget()
         self.max_repeated_errors = max_repeated_errors
         self.budget = self._new_budget()
+        # 实时事件的订阅者。这是**呈现层与逻辑层的解耦点**：
+        # 终端演示、日志、遥测都只是订阅者，循环本身不知道它们存在。
+        self._subscribers: list = []
+
+    # -- 订阅 -------------------------------------------------------------
+
+    def subscribe(self, listener) -> Any:
+        """订阅实时事件，返回取消订阅的函数。
+
+        **呈现层出错不能影响 agent 本身。** 所以 `_notify` 里每个订阅者都被
+        单独 try 包住——一个画界面的插件崩了，不该让整个 agent 也崩。
+        这条不是防御性编程的洁癖：演示程序最容易在"输出格式"上出问题
+        （终端不支持颜色、被重定向、编码不对），如果那能中断 agent，
+        这个架构就谈不上解耦。
+        """
+        self._subscribers.append(listener)
+
+        def unsubscribe() -> None:
+            if listener in self._subscribers:
+                self._subscribers.remove(listener)
+
+        return unsubscribe
+
+    def _notify(self, event: "Event") -> None:
+        for fn in list(self._subscribers):
+            try:
+                fn(event)
+            except Exception:  # noqa: BLE001 —— 订阅者的问题不该传播给 agent
+                pass
+
+    def _record(self, result: "RunResult", event: "Event") -> None:
+        """记一条事件：既进轨迹（供回放），也通知订阅者（供实时呈现）。"""
+        result.events.append(event)
+        self._notify(event)
 
     def _new_budget(self) -> Budget:
         t = self._budget_limits
@@ -226,10 +260,12 @@ class AgentLoop:
                 result.stopped_reason = "budget"
                 result.incomplete = reason
                 result.answer = self._degrade(result, reason)
-                result.events.append(Event(self.budget.turns, "budget", reason))
+                self._record(result, Event(self.budget.turns, "budget", reason))
                 break
 
             self.budget.consume_turn()
+            self._notify(Event(self.budget.turns, "turn", "开始第 "
+                               f"{self.budget.turns} 轮决策"))
             decision = self.model.decide(messages, self.tools.schemas())
             self.budget.consume_tokens(decision.tokens)
             result.turns = self.budget.turns
@@ -238,14 +274,14 @@ class AgentLoop:
                 result.answer = decision.text
                 result.stopped_reason = "final"
                 messages.append(Message("assistant", decision.text))
-                result.events.append(
+                self._record(result, 
                     Event(self.budget.turns, "final", decision.text[:80])
                 )
                 break
 
             call = decision.tool_call
             if call is None:
-                result.events.append(
+                self._record(result, 
                     Event(self.budget.turns, "decision", "模型既没调工具也没给答案")
                 )
                 result.stopped_reason = "error"
@@ -255,7 +291,7 @@ class AgentLoop:
             self.budget.consume_tool_call()
             ex = self.tools.execute(call)
             result.executions.append(ex)
-            result.events.append(Event(
+            self._record(result, Event(
                 self.budget.turns, "tool_result",
                 f"{call.name}({call.args}) -> "
                 + ("ok" if ex.result.ok else f"{ex.result.kind}: {ex.result.error}"),
@@ -287,7 +323,7 @@ class AgentLoop:
                     result.stopped_reason = "stuck"
                     result.incomplete = gate
                     result.answer = self._degrade(result, gate)
-                    result.events.append(
+                    self._record(result, 
                         Event(self.budget.turns, "budget", gate)
                     )
                     break

@@ -56,12 +56,12 @@
 **H1. 验证"这篇文档确实在语料里"，再用两份配置跑同一道题，看它的名次为什么消失。**
 
 先确认 `zh/vision/yolov5` 真的产出了可检索 chunk，然后分别用
-[`configs/l3_dense_only.yaml`](../../configs/l3_dense_only.yaml) 与
-[`configs/l2_hybrid.yaml`](../../configs/l2_hybrid.yaml) 重跑评测，
+[`configs/l3_dense_only.yaml`](../../../configs/l3_dense_only.yaml) 与
+[`configs/l2_hybrid.yaml`](../../../configs/l2_hybrid.yaml) 重跑评测，
 把 `q005`（"MaixPy 里怎么做 YOLO 物体检测？给出一个完整例程"）在两份报告里的
 **召回率与首位命中**抄下来对照。
 
-- 提示：两份报告都在 [`eval/results/`](../../eval/results/) 里；
+- 提示：两份报告都在 [`eval/results/`](../../../eval/results/) 里；
   想看**三路各自的名次**（而不是只看进没进 Top-5），用
   `python scripts/demo_retrieval.py --query "MaixPy 里怎么做 YOLO 物体检测？给出一个完整例程。" -k 20`。
   **只跑 `eval` 与这个脚本，不要跑 `index build --rebuild`**
@@ -74,7 +74,7 @@
 - 依据：[concepts/01 · 2 / 4.1](../concepts/01-RAG的完整链路.md) ·
   [tutorial 04 · 4.2 / R2](../../tutorial/04-检索与消融.md) ·
   [事故 02 · 同类问题清单](../../postmortem/02-有文档却召不回.md) ·
-  [`scripts/inspect_eval.py`](../../scripts/inspect_eval.py)
+  [`scripts/inspect_eval.py`](../../../scripts/inspect_eval.py)
 
 **H2. 把评测的 K 从 5 改成 50，先写下预测再跑。**
 
@@ -100,4 +100,4 @@
 - 动手题出处：[tutorial 00 主线导览](../../tutorial/00-主线导览.md)、
   [tutorial 02 · 4.3](../../tutorial/02-把手工流程变成系统.md)
 - 出题规则：[design 07 · 4 习题体系](../../design/07-文档体系设计.md)
-- 真实数字：[`eval/results/`](../../eval/results/) · [`eval/datasets/seed.jsonl`](../../eval/datasets/seed.jsonl)
+- 真实数字：[`eval/results/`](../../../eval/results/) · [`eval/datasets/seed.jsonl`](../../../eval/datasets/seed.jsonl)

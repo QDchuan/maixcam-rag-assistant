@@ -1,6 +1,6 @@
 # MaixCAM 开发助手 —— RAG × Harness 教学项目
 
-> **当前状态**：主分支（教学主线）已完成并可运行；**52 篇文档 / 761 KB**；129 个测试通过。
+> **当前状态**：主分支（教学主线）已完成并可运行；**54 篇文档 / 790 KB**；166 个测试通过。
 > Harness 分支与 Skill 分支待做。
 >
 > 一份**真实可用**的 MaixPy 开发助手，同时是一份**可跟做**的 RAG 与 Agent 教学材料。
@@ -65,8 +65,8 @@
 | 评测 | 两条轴 · 18 题 / 4 类 qtype · **能程序判的一律程序判** |
 | 防幻觉校验 | 符号白名单 + 导入别名解析 + 实例类型推断，带回归测试 |
 | **主分支 agent** | **五块机制完成**：服务注册表 / 工具 / 提示词装配 / 循环与预算 / 权限沙盒 |
-| 测试 | **129 个**（128 通过 + 1 显式跳过） |
-| 文档 | **52 篇 / 761 KB**（概念 / 教程 / 习题 / 事故档案 / 设计） |
+| 测试 | **166 个**（165 通过 + 1 显式跳过） |
+| 文档 | **54 篇 / 790 KB**（概念 / 教程 / 习题 / 事故档案 / 设计） |
 
 ---
 
@@ -154,17 +154,27 @@ python -m maixrag --config configs/l2_hybrid.yaml corpus adopt   # 或 corpus fe
 python -m maixrag --config configs/l2_hybrid.yaml corpus build
 python -m maixrag --config configs/l2_hybrid.yaml index build
 
-# 5. 跑主分支的 agent（不配密钥也能跑通全流程）
+# 5. 终端演示 —— 看 agent 一轮一轮做决策（呈现层是个可拔的插件）
+python -m maixrag demo --list                      # 看能问什么，不需要密钥
+python -m maixrag demo --fake-chat "MaixCAM 的 GPIO 怎么用？"   # 完全离线
+python -m maixrag demo --max-turns 10 "MaixCAM 的 GPIO 怎么用？怎么点灯？"   # 真实模型
+
+# 6. 跑主分支的 agent（不配密钥也能跑通全流程）
 python -m maixrag --config configs/l2_hybrid.yaml agent "MaixPy 里怎么做 YOLO 物体检测？" --fake-chat
 python -m maixrag --config configs/l2_hybrid.yaml agent "MaixPy 里怎么做 YOLO 物体检测？" --max-turns 10
 
-# 6. 只测检索轴（不花钱、不联网、不需要模型 key）
+# 7. 只测检索轴（不花钱、不联网、不需要模型 key）
 python -m maixrag --config configs/l2_hybrid.yaml eval --level rag --fake-chat
 python scripts/inspect_eval.py          # 看每条指标覆盖了多少题
 
-# 7. 防幻觉校验器
+# 8. 防幻觉校验器
 python scripts/check_symbols_demo.py
+python scripts/regress_check_api_usage.py    # 校验器真的在检查，而不是"检查了 0 个符号"
 ```
+
+> **`demo` 和 `agent` 的区别**：`agent` 是给评测与调试用的（跑完一次性打印轨迹），
+> `demo` 是给人看的（实时画过程 + 启动画面）。
+> 两者跑的是**同一个 agent**——`demo` 只是多挂了一个呈现插件。
 
 **为什么嵌入用本地 Ollama**：DeepSeek 不提供 embeddings 接口（实测 404）。
 本地 `bge-m3` 多语言、中文强、零成本、可离线——对教学项目最合适。
@@ -195,7 +205,7 @@ python scripts/check_symbols_demo.py
 大多数教学项目展示的是打磨过的正确路径。但 RAG 与 agent 工程里最难的部分，
 恰恰是**东西安静地坏掉**的时候——没有报错、没有异常、指标看起来还行。
 
-六次真实事故，每一次都有完整的症状 → 根因 → 修复 → 回归测试：
+七次真实事故，每一次都有完整的症状 → 根因 → 修复 → 回归测试：
 
 | 事故 | 教的是哪一类判断 |
 | --- | --- |
@@ -205,8 +215,14 @@ python scripts/check_symbols_demo.py
 | [被清空的统计](./docs/postmortem/04-被清空的统计.md) | 状态生命周期 |
 | [伪装成好消息的 0](./docs/postmortem/05-伪装成好消息的0.md) | 指标会伪装成好消息 |
 | [预算与任务不匹配](./docs/postmortem/06-预算与任务不匹配.md) | 参数要匹配任务 |
+| [校验静默放行](./docs/postmortem/07-校验静默放行.md) | **"没查出错" ≠ "没查"** |
 
-**六条覆盖六种不同类别的判断力**，而每一条都能被复现。
+**七条覆盖七种不同类别的判断力**，而每一条都能被复现。
+
+> 第七条是**跑终端演示时发现的**：agent 在答案最后自己写道
+> 「这次自检实际没有起到校验作用」。顺这句话查下去，发现第一级防幻觉校验
+> 在最需要它的那条路径上一次也没生效，却对模型返回了成功。
+> 有些 bug 不是难修，是**难被看见**——这就是演示程序的额外价值。
 
 ---
 
@@ -220,6 +236,16 @@ python scripts/demo_planes.py     # 架构错：把服务放错平面
 python scripts/demo_budget.py     # 工程错：不设预算的 agent 会跑飞（且失败是无声的）
 python scripts/demo_sandbox.py    # 安全错：权限越界，"拦住了"≠"拦对了"
 ```
+
+另外还有一个**给人看的**终端演示（启动画面 + 实时轨迹 + 可插拔呈现层）：
+
+```bash
+python -m maixrag demo --fake-chat "MaixCAM 的 GPIO 怎么用？"
+```
+
+它的呈现层是一个**插件**，不是硬编码进循环的。把它拔掉，agent 一行代码都不用改。
+"可插拔"这个说法唯一的证明方式，就是真的插拔一次——见
+[tutorial 08 终端演示](./docs/tutorial/08-终端演示.md)。
 
 ---
 
