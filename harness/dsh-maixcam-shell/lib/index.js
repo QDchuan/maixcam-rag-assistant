@@ -27,9 +27,11 @@ import {
 	embed,
 	loadCorpus,
 	lookupSymbol,
+	moduleCoverage,
 	toEvidence,
 	topK,
 } from './corpus.js'
+import { rrf } from './bm25.js'
 import { createCorpusTools, unavailable } from './tools.js'
 import { checkSymbols } from './symbols.js'
 
@@ -156,15 +158,14 @@ export function apply(ctx, config) {
 	}
 
 	/**
-	 * 跑一次检索。路由和 agent 工具共用这一条路径 —— 只有一份实现，
-	 * 界面看到的和模型看到的就一定是同一件事。
+	 * 跑一次**混合检索**：稠密 + 稀疏，RRF 融合。
 	 *
-	 * @param query - 查询词。
+	 * @param c - 语料句柄。
+	 * @param text - 查询词。
 	 * @param k - 取几条。
-	 * @returns 与 `/search` 相同形状的结果（失败时抛错）。
+	 * @returns `{ hits, embedMs }`。
 	 */
-	async function search(query, k) {
-		const c = await ensureCorpus()
+	async function hybrid(c, text, k) {
 		const started = Date.now()
 		const vector = await embed(
 			{
@@ -173,16 +174,86 @@ export function apply(ctx, config) {
 				apiKey: settings.embedApiKey,
 				timeoutMs: settings.embedTimeoutMs,
 			},
-			query,
+			text,
 		)
 		const embedMs = Date.now() - started
+
+		// 两路各多取一些再融合：只在 k 条上融合，会丢掉「另一路排第 8」的好结果。
+		const pool = Math.max(k * 3, 12)
+		const dense = topK(c, vector, pool)
+		const sparse = c.bm25.search(text, pool)
+
+		const hits = rrf([dense, sparse], k).map((hit) => ({
+			...toEvidence(c, hit),
+			// 每一路各给了第几名 —— 让「这条为什么被选中」可见。
+			from: hit.from,
+			fused: Number(hit.score.toFixed(5)),
+		}))
+		return { hits, embedMs }
+	}
+
+	/**
+	 * 跑一次检索：**稠密 + 稀疏，RRF 融合**，并附一份模块覆盖度。
+	 *
+	 * 路由和 agent 工具共用这一条路径 —— 只有一份实现，界面看到的和模型看到的
+	 * 就一定是同一件事。
+	 *
+	 * 为什么是两路：实测过稠密单路的病 —— 问「设计一个人脸跟随系统」，6 条命中
+	 * **全部**落在 `projects`/`vision`，锚死在「人脸追踪2轴云台」一页；
+	 * 而「舵机 PWM」「串口 uart」这些子系统查询与它的重合是 **0 条**。
+	 * 稀疏那一路上靠的是**整词命中**（`pwm`、`uart`、`find_blobs`），
+	 * 恰好补的就是稠密漏掉的那类关键词证据。
+	 *
+	 * ## `aspects`：把「拆子系统」变成可检查的
+	 *
+	 * 单条查询天然只覆盖一个面向，所以「怎么设计 X」必然锚死在那个像整题的页面上。
+	 * 靠提示词求模型「记得想舵机」是软的；也试过一个自动推断「相关但未命中模块」的
+	 * 办法，不成立 —— 模块名是英文、查询是中文，词面对不上，恒为空。
+	 *
+	 * 管用的做法是**让模型自己报子系统，然后逐个查、逐个报有没有证据**：
+	 *
+	 *     search_docs({ query: '设计一个人脸跟随系统',
+	 *                   aspects: ['人脸检测', '舵机控制', '串口通信', '供电'] })
+	 *
+	 * 每个 aspect 都明写命中几条；**命中 0 条的那个就是信号** ——
+	 * 「舵机控制：本地无证据」必须出现在工具结果里，也就必须出现在回答里。
+	 * 与 `check_api_usage` 同一个手法：**让缺的东西显形，而不是不存在。**
+	 *
+	 * @param query - 查询词。
+	 * @param k - 每个面向取几条。
+	 * @param aspects - 可选的子系统清单；给了就逐个子系统检索。
+	 * @returns 检索结果（失败时抛错）。
+	 */
+	async function search(query, k, aspects = []) {
+		const c = await ensureCorpus()
+		const started = Date.now()
+
+		if (aspects.length === 0) {
+			const { hits, embedMs } = await hybrid(c, query, k)
+			return {
+				query,
+				k,
+				strategy: 'hybrid(rrf: dense+bm25)',
+				embedMs,
+				totalMs: Date.now() - started,
+				coverage: moduleCoverage(c, hits),
+				hits,
+			}
+		}
+
+		const facets = []
+		for (const aspect of aspects) {
+			const { hits } = await hybrid(c, aspect, k)
+			facets.push({ aspect, n: hits.length, coverage: moduleCoverage(c, hits), hits })
+		}
 		return {
 			query,
 			k,
-			strategy: 'dense',
-			embedMs,
+			aspects,
+			strategy: 'hybrid(rrf: dense+bm25) × 多面向',
 			totalMs: Date.now() - started,
-			hits: topK(c, vector, k).map((hit) => toEvidence(c, hit)),
+			empty: facets.filter((f) => f.n === 0).map((f) => f.aspect),
+			facets,
 		}
 	}
 
@@ -208,9 +279,13 @@ export function apply(ctx, config) {
 		const query = (url.searchParams.get('q') ?? '').trim()
 		const k = Math.min(Math.max(Number(url.searchParams.get('k')) || settings.topK, 1), 20)
 		if (query === '') return json({ ok: false, error: '缺少查询词 q' }, 400)
+		const aspects = (url.searchParams.get('aspects') ?? '')
+			.split(',')
+			.map((s) => s.trim())
+			.filter((s) => s !== '')
 
 		try {
-			return json({ ok: true, ...(await search(query, k)) })
+			return json({ ok: true, ...(await search(query, k, aspects)) })
 		} catch (error) {
 			// 检索失败要说清楚是嵌入服务的问题，而不是「没找到」。
 			return json({ ok: false, error: reason(error), stage: 'embed' }, 503)
@@ -245,9 +320,9 @@ export function apply(ctx, config) {
 			return
 		}
 		const tools = createCorpusTools({
-			search: async (query, k) => {
+			search: async (query, k, aspects) => {
 				try {
-					return await search(query, k)
+					return await search(query, k, aspects)
 				} catch (error) {
 					// 工具失败要说清原因，别让模型把「查不了」当成「没有」。
 					throw new CorpusError(unavailable(error))

@@ -38,6 +38,7 @@
 
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { buildBm25, tokenize } from './bm25.js'
 
 /** 语料产物缺失、损坏，或彼此对不上时抛这个。 */
 export class CorpusError extends Error {
@@ -239,6 +240,11 @@ export function loadCorpus({ root }) {
 		roster,
 		/** 白名单的集合形态：符号校验要按名字查很多次，用 Set 而不是数组。 */
 		rosterSet: new Set(roster),
+		/**
+		 * 稀疏那一路。从 `chunks.jsonl` 现建，**不复用** `indexes/bm25.json`
+		 * （那是 Python 侧分词器的派生物，见 `bm25.js` 顶部）。
+		 */
+		bm25: buildBm25(chunks),
 		stats: {
 			chunks: chunks.length,
 			dim: cols,
@@ -248,6 +254,58 @@ export function loadCorpus({ root }) {
 			embeddingModel: meta.embedding_model ?? vectorsMeta.model_name ?? '未知',
 			corpusFingerprint: meta.corpus_fingerprint ?? '',
 		},
+	}
+}
+
+/**
+ * 本次命中的**模块覆盖度**。
+ *
+ * 这是「让缺口显形」那一条的具体实现。实测过的病是这样：问「设计一个人脸跟随系统」，
+ * 稠密检索 6 条命中**全部**落在 `projects` / `vision` 两个模块里，而语料其实还有
+ * `maix.nn`、`maix.image`、`peripheral`(PWM/UART) 等等 —— 但**没有任何东西告诉模型
+ * 「你只覆盖了 2 个模块」**，于是它就把那一页当成了全部。
+ *
+ * 把命中模块的分布和语料模块总数一起交出去，窄就变成可见的窄。
+ *
+ * `relevantMissing` 是这份回报的关键：把「未命中」里**与本次查询有词面关联**的挑出来。
+ * 不挑的话，一个 70 模块的语料每次都会倒出六十几个无关模块名，那是噪音不是信号；
+ * 挑完之后，问人脸跟随系统时会冒出 `maix.nn` / `maix.image`，
+ * 问舵机时会冒出 `maix.peripheral.pwm` —— 那才是「你没想到的那一块」。
+ *
+ * @param corpus - 语料句柄。
+ * @param evidence - 本次返回的证据（含 `module`）。
+ * @param query - 本次查询，用来判断哪些未命中模块「本该想到」。
+ * @returns `{ hit, total, missing, relevantMissing }`。
+ */
+export function moduleCoverage(corpus, evidence, query = '') {
+	const all = new Map()
+	for (const c of corpus.chunks) {
+		const m = c.meta?.module ?? '未标注'
+		all.set(m, (all.get(m) ?? 0) + 1)
+	}
+
+	const hit = new Map()
+	for (const e of evidence) {
+		const m = e.module || '未标注'
+		hit.set(m, (hit.get(m) ?? 0) + 1)
+	}
+
+	const missing = [...all.keys()].filter((m) => !hit.has(m)).sort()
+
+	// 未命中模块里，名字与查询有词面关联的那些 —— 按语料体量降序，取前 8。
+	const qTokens = new Set(tokenize(query))
+	const relevantMissing = missing
+		.map((m) => ({ module: m, n: all.get(m) ?? 0, share: tokenize(m).filter((t) => qTokens.has(t)).length }))
+		.filter((x) => x.share > 0)
+		.sort((a, b) => b.share - a.share || b.n - a.n)
+		.slice(0, 8)
+		.map(({ module, n }) => ({ module, n }))
+
+	return {
+		hit: [...hit.entries()].map(([module, n]) => ({ module, n })).sort((a, b) => b.n - a.n),
+		total: all.size,
+		missing,
+		relevantMissing,
 	}
 }
 

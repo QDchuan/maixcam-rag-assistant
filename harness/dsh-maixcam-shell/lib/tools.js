@@ -53,18 +53,80 @@ function oneLine(text, max) {
  * 每条都带**出处**与**相似度**：相似度让模型能看出「这条其实不太像」，
  * 出处让用户能自己点过去核对。两者缺一，这个工具就退化成一个更慢的搜索框。
  *
+ * 除命中之外还交一份**模块覆盖度**：命中落在哪几个模块、语料一共几个模块、
+ * 哪些模块**一条都没命中**。这一行是给模型看的「你这次只覆盖了这么窄」——
+ * 实测的病正是它在 `projects`/`vision` 里找到一页就当成全部，
+ * 而没有任何东西告诉它「PWM、UART 这些模块你一条都没碰到」。
+ *
  * @param result - `/search` 返回的结构。
  * @returns 模型面向的内容块。
  */
 function renderHits(result) {
+	// ── 多面向：逐个子系统报命中与**缺口** ──────────────────────────────────
+	if (Array.isArray(result.facets)) {
+		const out = [
+			`多面向检索：${result.facets.length} 个子系统（${result.strategy} · 共 ${result.totalMs} ms）`,
+			'',
+		]
+		for (const f of result.facets) {
+			if (f.n === 0) {
+				out.push(`## ${f.aspect} —— **本地无证据**`)
+				out.push('    本地知识库里没有关于这一块的内容。必须在回答里明说，不要凭印象补全。')
+			} else {
+				const mods = f.coverage.hit.map((h) => `${h.module}(${h.n})`).join(' ')
+				out.push(`## ${f.aspect} —— 命中 ${f.n} 条（模块 ${mods}）`)
+				for (const [i, h] of f.hits.entries()) {
+					const where = [h.doc_title || h.doc_id, ...(h.heading_path ?? [])]
+						.filter((s) => s && s !== '(开头)').join(' › ')
+					out.push(`  [${i + 1}] ${h.score.toFixed(3)} ${where}`)
+					if (h.url) out.push(`      来源：${h.url}`)
+					out.push(`      片段：${oneLine(h.text, 200)}`)
+				}
+			}
+			out.push('')
+		}
+		if (result.empty.length > 0) {
+			out.push(`**有 ${result.empty.length} 个子系统本地无证据：${result.empty.join(' · ')}**`)
+			out.push('这些就是这次回答的边界。不要用看起来合理的方案把它们填上。')
+		}
+		out.push('说明：回答时只使用上面出现的内容并写明来源；缺口要明说。')
+		return [{ type: 'text', text: out.join('\n') }]
+	}
+
 	const head =
-		`知识库命中 ${result.hits.length} 条（稠密检索 · 嵌入 ${result.embedMs} ms · 共 ${result.totalMs} ms）`
+		`知识库命中 ${result.hits.length} 条（${result.strategy} · 嵌入 ${result.embedMs} ms · 共 ${result.totalMs} ms）`
+
+	const cov = result.coverage
+	const covLines = []
+	if (cov) {
+		covLines.push(
+			`本次命中覆盖 ${cov.hit.length} / ${cov.total} 个模块：`
+				+ cov.hit.map((h) => `${h.module}(${h.n})`).join(' · '),
+		)
+		const rel = cov.relevantMissing ?? []
+		if (rel.length > 0) {
+			covLines.push(
+				`**与本次问题相关、但一条都没命中的模块：${rel.map((x) => x.module).join(' · ')}**。`
+					+ '这几块如果用户的系统要用到，本次检索**没有给出任何依据** —— '
+					+ '必须明说「本地知识库里没有这部分」，不要凭印象补全；'
+					+ `确实需要就去补一次有针对性的检索。`,
+			)
+		} else if (cov.missing.length > 0) {
+			covLines.push(
+				`另有 ${cov.missing.length} 个模块本次未命中（与本次问题看不出词面关联）。`,
+			)
+		}
+	}
+
 	const lines = result.hits.map((hit, i) => {
 		const where = [hit.doc_title || hit.doc_id, ...(hit.heading_path ?? [])]
 			.filter((s) => s && s !== '(开头)')
 			.join(' › ')
+		const from = hit.from
+			? `（稠密 #${hit.from.dense ?? '—'} · 稀疏 #${hit.from.sparse ?? '—'}）`
+			: ''
 		return [
-			`[${i + 1}] score=${hit.score.toFixed(3)}  ${where}`,
+			`[${i + 1}] score=${hit.score.toFixed(3)} ${from} ${where}`,
 			hit.url ? `    来源：${hit.url}` : null,
 			`    片段：${oneLine(hit.text, 260)}`,
 		]
@@ -74,7 +136,7 @@ function renderHits(result) {
 	const tail =
 		'说明：以上片段是本次检索能给出的全部依据。回答时只使用这里出现的内容，'
 		+ '并写出对应的来源；没有覆盖到的部分直说不知道，不要补全。'
-	return [{ type: 'text', text: [head, ...lines, '', tail].join('\n') }]
+	return [{ type: 'text', text: [head, ...covLines, '', ...lines, '', tail].join('\n') }]
 }
 
 /**
@@ -156,7 +218,16 @@ export function createCorpusTools(deps) {
 				},
 				k: {
 					type: 'integer',
-					description: '取几条，默认 6，最多 20。',
+					description: '每个面向取几条，默认 6，最多 20。',
+				},
+				aspects: {
+					type: 'array',
+					items: { type: 'string' },
+					description:
+						'子系统清单。**问「怎么设计/实现某个系统」时必须给**：先把系统拆成若干子系统'
+						+ '（例如人脸跟随系统 → 人脸检测、舵机控制、串口通信、供电、机械结构），'
+						+ '每个子系统一个字符串。工具会逐个检索并逐个告诉你哪个子系统本地没有证据 —— '
+						+ '那些就是你这次回答的边界。简单的事实性问题可以不给。',
 				},
 			},
 			output: { schema: { type: 'json' }, render: (_args, value) => renderHits(value) },
@@ -164,7 +235,10 @@ export function createCorpusTools(deps) {
 			isConcurrencySafe: () => true,
 			async execute(args) {
 				const k = Math.min(Math.max(Number(args.k) || 6, 1), 20)
-				return deps.search(String(args.query ?? ''), k)
+				const aspects = Array.isArray(args.aspects)
+					? args.aspects.map((s) => String(s ?? '').trim()).filter((s) => s !== '').slice(0, 10)
+					: []
+				return deps.search(String(args.query ?? ''), k, aspects)
 			},
 		}),
 
