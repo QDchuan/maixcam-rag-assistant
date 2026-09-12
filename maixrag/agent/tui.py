@@ -190,9 +190,9 @@ def banner(stats: dict[str, Any] | None = None) -> str:
         lines.append(f"{C_DIM}语料{RESET} {stats.get('chunks', '?')} chunk"
                      f"{C_DIM}   ·   工具{RESET} {stats.get('tools', '?')} 个"
                      f"{C_DIM}   ·   权限{RESET} {stats.get('caps', '?')} 类")
-        lines.append(f"{C_DIM}检索{RESET} BM25 + 向量 + RRF"
-                     f"{C_DIM}   ·   评测{RESET} 两条轴"
-                     f"{C_DIM}   ·   预算{RESET} 3 条线")
+        lines.append(f"{C_DIM}检索{RESET} {stats.get('retrieval', '?')}"
+                     f"{C_DIM}   ·   预算{RESET} {stats.get('budget', '?')} 轮"
+                     f"{C_DIM}   ·   评测{RESET} 两条轴")
     lines.append("")
     lines.append(f"{C_DIM}联系方式  {CONTACT}{RESET}")
     lines.append("")
@@ -357,14 +357,33 @@ def build_banner_stats(app) -> dict[str, Any]:
     刻意不写死标语：启动画面上每一个数都应该来自实际装配出来的对象。
     一条写死的"3838 chunk"在语料变了之后就成了假话——
     而演示程序里出现假话，比没有演示更糟。
+
+    **这条规矩抓到过真事**：横幅原来硬编码写"检索 BM25 + 向量 + RRF"，
+    而当时的默认配置其实是 `retrievers: ["dense"]`——**只跑稠密检索**。
+    启动画面在描述一套没有启用的配置。现在那一行是从检索器本身取的。
     """
     caps: set[str] = set()
     for t in app.tools.schemas():
         caps |= set(t.get("requires", []))
+
+    r = app.rag.retriever
+    if r is None:
+        retrieval = "未启用检索"
+    else:
+        names = {"dense": "向量", "bm25": "BM25"}
+        parts = [names.get(m.name, m.name) for m in getattr(r, "members", [])]
+        fusion = getattr(r, "fusion", "")
+        retrieval = " + ".join(parts) + (f" + {fusion.upper()}" if fusion else "")
+
+    budget = getattr(
+        getattr(getattr(app, "loop", None), "_budget_limits", None),
+        "max_turns", "?")
     return {
         "chunks": len(app.rag.chunks),
         "tools": len(app.tools.names()),
         "caps": len(caps),
+        "retrieval": retrieval or "未启用检索",
+        "budget": budget,
     }
 
 

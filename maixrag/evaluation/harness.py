@@ -201,6 +201,9 @@ class GenerationMetrics:
     citation_recall: float = 0.0
     must_contain_ok: bool = False
     must_not_contain_violated: list[str] = field(default_factory=list)
+    # **被否定语境豁免的禁用词。** 单独记，不混进上面那个列表——
+    # 因为它们是两件性质完全不同的事，混在一起的后果见下方 check_must_not_contain。
+    must_not_contain_negated: list[str] = field(default_factory=list)
     # 符号级幻觉：本项目防幻觉的核心指标
     unknown_symbols: list[str] = field(default_factory=list)
     symbol_checked: int = 0
@@ -435,13 +438,113 @@ def check_symbols(text: str, roster: set[str], *,
     return unknown, len(refs)
 
 
+# 否定语境标记。出现在禁用词**附近**时，说明那句话是在说"不要用它"，
+# 而不是"用它"。
+#
+# 这个名单必须**短**：它只负责挡掉最明显的那一类误报，
+# 剩下的交给人工看上下文。想靠关键词穷举来精确判断语气，
+# 是本项目在事故 03 里已经吃过一次的亏。
+_NEGATION_MARKERS = (
+    "不要", "不能", "不用", "不应该", "不该", "不支持", "不允许", "禁止",
+    "没有", "不存在", "不是", "并非", "别用", "区别", "代替", "而不是",
+    "错误", "误用", "混淆", "旧版", "老版本", "移植", "对比",
+)
+
+# 句子边界。中文答案里就这几种，加换行（代码块与列表项靠它切）。
+_SENTENCE_END = "。！？；\n"
+
+
+def _sentence_around(text: str, term: str) -> str:
+    """禁用词**所在的那一句**。
+
+    ## 为什么按句子，而不是按固定窗口
+
+    第一版用的是"前后 60 个字符"。它在短答案上会失效：
+
+        「不要用 picamera。用 cv2.VideoCapture 读帧。」
+
+    两个词都在 60 字符以内，于是**真的使用了 `cv2.VideoCapture` 的那一句
+    也被一起豁免了**——豁免逻辑从"防误报"变成了"什么都放过"。
+    这个 bug 是被一条"同一题里既警告了 A、也真的用了 B"的测试抓出来的。
+
+    按句子切就没有这个问题：否定只对**它自己那一句**里的词负责。
+    这也更接近人读这句话时的直觉——判断"他是不是在用这个 API"，
+    看的是那一句，不是附近一段。
+    """
+    idx = text.find(term)
+    if idx < 0:
+        return ""
+    start = 0
+    for i in range(idx - 1, -1, -1):
+        if text[i] in _SENTENCE_END:
+            start = i + 1
+            break
+    end = len(text)
+    for i in range(idx + len(term), len(text)):
+        if text[i] in _SENTENCE_END:
+            end = i
+            break
+    return text[start:end]
+
+
+def check_must_not_contain(text: str, terms: list[str]) -> tuple[list[str], list[str]]:
+    """检查禁用词。返回 (真命中, 被否定语境豁免的)。
+
+    ## 为什么不能简单地 `term in text`
+
+    题目里的 `must_not_contain` 是 `cv2.VideoCapture` / `picamera` 这类
+    **别的框架的 API**，本意是抓"模型把 OpenCV 的习惯带进来了"。
+
+    但实测抓到的是这一句（q001，答案**完全正确**）：
+
+        > 不要用 `sensor.snapshot()`（K210 时代 MaixPy v1 的写法）或 `picamera`，
+        > 这里的入口只有 `camera.Camera` [1]
+
+    **它在警告用户不要用 `picamera`** —— 而指标把它记成了一次"触犯"。
+
+    这比"偶尔误报"严重得多，因为它是一条**反向的激励**：
+
+        agent 答得越负责（越主动列出"不要用哪些别家的 API"），
+        这个指标就越差。
+
+    也就是说，照这个指标去调优，最优策略是**不要提醒用户**。
+    这正是事故 03「校验器把正确代码判成幻觉」的同一个病，
+    只不过这次病的不是符号白名单，是生成轴的禁用词检查。
+
+    ## 判据与边界
+
+    否定标记必须出现在**禁用词所在的那一句**里（见 `_sentence_around`）。
+    豁免的单独返回，**不丢掉**——它们仍然会出现在报告里（带 `~` 前缀），
+    只是不计入"触犯禁止项比例"，因为那个数字的含义是"模型真的采用了别家 API"。
+
+    **假阴性是可接受的**：一句真把 `picamera` 当解法的回答，
+    它那一句里通常不会有"不要/没有/不支持"这类词。
+    而假阳性会直接扭曲优化方向——那是更贵的错。
+
+    见 [事故 03](../postmortem/03-校验器把正确代码判成幻觉.md) 与
+    [事故 07](../postmortem/07-校验静默放行.md)——同一个家族的问题。
+    """
+    violated: list[str] = []
+    negated: list[str] = []
+    for term in terms:
+        if term not in text:
+            continue
+        sent = _sentence_around(text, term)
+        if any(mark in sent for mark in _NEGATION_MARKERS):
+            negated.append(term)
+        else:
+            violated.append(term)
+    return violated, negated
+
+
 def evaluate_generation(item: EvalItem, ans: Answer, roster: set[str]) -> GenerationMetrics:
     """算生成轴指标。绝大部分不调用模型。"""
     m = GenerationMetrics(refused=ans.refused)
     text = ans.text
 
     m.must_contain_ok = all(s in text for s in item.must_contain) if item.must_contain else True
-    m.must_not_contain_violated = [s for s in item.must_not_contain if s in text]
+    m.must_not_contain_violated, m.must_not_contain_negated = check_must_not_contain(
+        text, item.must_not_contain)
 
     unknown, checked = check_symbols(text, roster)
     m.unknown_symbols = unknown
@@ -596,14 +699,26 @@ class Report:
                 f"{agg['hallucination_rate']:.3f} | {agg['refusal_rate']:.3f} |"
             )
 
+        # 逐题明细里带上**禁止项**与**符号覆盖面**。
+        #
+        # 加这两列是因为"触发禁止项比例 0.056"这样的总览数字**没法行动**：
+        # 它告诉你有一题踩了线，但不说是哪一题、踩的是哪个词。
+        # 而这一层的全部价值就在于"能定位"——见事故 05「指标必须暴露覆盖面」。
         lines += ["", "## 逐题明细", "",
-                  "| qid | qtype | 召回率 | 首位命中 | 幻觉符号 | 拒答 |",
-                  "| --- | --- | --- | --- | --- | --- |"]
+                  "| qid | qtype | 召回率 | 首位命中 | 幻觉符号 | 检查了 | 禁止项 | 拒答 |",
+                  "| --- | --- | --- | --- | --- | --- | --- | --- |"]
         for r in self.items:
             fh = "-" if r.ret.first_hit_rank is None else str(r.ret.first_hit_rank + 1)
             unk = ",".join(r.gen.unknown_symbols) or "-"
+            viol = ",".join(r.gen.must_not_contain_violated) or "-"
+            # 豁免的也显示出来（带 ~ 前缀）：**让人能看见"什么被放过了"**，
+            # 否则豁免逻辑本身就成了一个新的黑箱。
+            exempt = r.gen.must_not_contain_negated
+            if exempt:
+                viol += "  (~" + ",".join(exempt) + ")"
             lines.append(
                 f"| {r.qid} | {r.qtype} | {r.ret.recall:.2f} | {fh} | {unk} | "
+                f"{r.gen.symbol_checked} | {viol} | "
                 f"{'是' if r.gen.refused else '否'} |"
             )
         lines.append("")
@@ -640,6 +755,7 @@ class Report:
                         "refused": r.gen.refused,
                         "refusal_correct": r.gen.refusal_correct,
                         "must_not_contain_violated": r.gen.must_not_contain_violated,
+                        "must_not_contain_negated": r.gen.must_not_contain_negated,
                         "must_contain_ok": r.gen.must_contain_ok,
                     },
                 }

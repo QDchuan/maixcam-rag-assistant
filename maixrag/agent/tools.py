@@ -75,6 +75,20 @@ class ToolResult:
 
     **`ok=False` 不是异常**，而是"这次调用没成功"这一事实的可传递形式。
     模型会读到 `error` 并决定下一步——重试、换参数、还是放弃。
+
+    ## `evidence`：这次调用**学到了什么**
+
+    一个稳定的标识集合——搜到的 chunk_id、查到的符号名、列出的模块名。
+    它不给人看，只给循环用来判断**有没有带回新东西**。
+
+    为什么要单独一个字段，而不是让循环去解析 `content` 文本？
+    因为文本会因为无关的细节而不同：同一批片段在第二次检索时，
+    结尾那行"（本次返回 5 个片段，编号从 6 到 10）"的编号变了，
+    于是**一模一样的证据看起来像是新证据**。
+    抓文本指纹会被这种噪声骗过，抓证据 id 不会。
+
+    这也让"原地打转"这件事变成可测的：
+    连续 N 次调用的 evidence 全是见过的 → 模型在原地打转。
     """
 
     ok: bool
@@ -87,10 +101,12 @@ class ToolResult:
     #   "transient"     外部/临时故障，可重试
     #   "internal"      工具自身有 bug
     kind: str | None = None
+    evidence: tuple[str, ...] = ()
 
     @classmethod
-    def success(cls, content: str) -> "ToolResult":
-        return cls(ok=True, content=content)
+    def success(cls, content: str,
+                evidence: tuple[str, ...] = ()) -> "ToolResult":
+        return cls(ok=True, content=content, evidence=evidence)
 
     @classmethod
     def failure(cls, error: str, kind: str = "internal") -> "ToolResult":

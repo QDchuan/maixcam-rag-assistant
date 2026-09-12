@@ -167,9 +167,16 @@ class RetrievalConfig:
     # mode=none 表示"我们决定不检索"（L-1 全文上下文），
     # 与"检索了但取很多"必须是两件可区分的事，否则报告无法解读。
     mode: str = "retrieve"  # retrieve | none
-    retrievers: list[str] = field(default_factory=lambda: ["dense"])
+    # 默认就是混合检索。**这里曾经是 ["dense"]**，而终端演示的启动画面写着
+    # "检索 BM25 + 向量 + RRF"——也就是说横幅在描述一个并没有启用的配置。
+    # 默认值就是大多数人会用的值，所以它必须等于本项目**推荐**的那套，
+    # 而不是"最小的那套"：想让读者看到的东西，和默认跑起来的东西，必须是同一个。
+    retrievers: list[str] = field(default_factory=lambda: ["dense", "bm25"])
     fusion: str = "rrf"
-    top_k: int = 20
+    # 也是"默认必须等于推荐"：本项目的主指标就叫 Recall@**5**，
+    # 而内置默认曾经是 20。评测跑的是 5、演示跑的是 20，
+    # 于是"文档里的数字"和"你跑出来的东西"不是同一套配置。
+    top_k: int = 5
     rerank: RerankConfig = field(default_factory=RerankConfig)
 
 
@@ -187,10 +194,25 @@ class GenerationConfig:
 @dataclass
 class AgentConfig:
     enabled: bool = False
-    max_turns: int = 6
-    # Agent 默认关闭：没有证据表明它一定更好，所以它是一个待评测的假设。
+    # 轮次预算只有一个出处，就是这里。
+    #
+    # 这里曾经出现过三个不同的默认值：Budget() 是 6、配置里是 6、
+    # 而 CLI 在 agent 未启用时兜底成 4。**于是一个真实的多跳问题
+    # （"如何设计一个二维云台人脸跟踪系统"）跑到第 4 轮就被判超预算**——
+    # 用户看到的是 agent "不肯好好回答"，而原因只是三个数字没对齐。
+    #
+    # 判断依据是**任务深度**，不是"越小越省钱"：MaixCAM 这类问题
+    # 往往要先检索、再查签名、再打开整篇文档、再自检，四步全是必要的。
+    # 实测：一个复合问题（"设计一个二维云台人脸跟踪系统" = 云台控制 + 人脸检测 + 整合）
+    # 在 8 轮下仍然只够走完两条支线，12 轮才够。
+    max_turns: int = 12
+    # 工具清单。**这里是权威列表**，RagToolsPlugin 按它注册。
+    # 曾经写过 "get_page"——一个并不存在的工具，配置在说谎。
     tools: list[str] = field(
-        default_factory=lambda: ["search_docs", "lookup_api", "check_api_usage", "get_page"]
+        default_factory=lambda: [
+            "search_docs", "read_doc", "lookup_api", "list_api",
+            "check_api_usage",
+        ]
     )
 
 

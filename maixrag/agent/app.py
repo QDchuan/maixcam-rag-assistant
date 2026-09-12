@@ -130,7 +130,7 @@ def build_agent(
 
     # --- 会话平面 ---
     session = reg.scope("session")
-    session.mount(RagToolsPlugin(rag))
+    session.mount(RagToolsPlugin(rag, only=cfg.agent.tools))
 
     if policy is not None:
         session.mount(SandboxPlugin(policy))

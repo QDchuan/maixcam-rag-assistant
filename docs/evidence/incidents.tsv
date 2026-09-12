@@ -6,3 +6,4 @@ id	类别	症状	回归测试	关键断言	复现命令	最后验证
 05	失败处理	某个指标是 0.000 / 100%，看起来很好	scripts/inspect_eval.py::	每条指标必须显示自己的覆盖面（分母）	python scripts/inspect_eval.py	2026-09
 06	参数与调优	agent 有时候比不用 agent 还差	tests/test_agent_loop.py::test_budget_exhaustion_degrades_gracefully,tests/test_agent_loop.py::test_no_budget_means_runaway	预算耗尽必须优雅降级；没有预算则必然跑飞	python -m pytest tests/test_agent_loop.py -k budget -q	2026-09
 07	校验与信任	校验工具打了勾，但它其实什么都没检查	tests/test_symbol_verification.py::test_bare_code_is_actually_parsed,scripts/regress_check_api_usage.py::	裸代码必须解析出符号；"解析不出"必须是失败	python scripts/regress_check_api_usage.py	2026-09
+08	工具接口	检索明明排第一，agent 却反复换措辞搜索到预算耗尽	tests/test_agent_progress.py::test_read_doc_returns_the_whole_document_in_order,tests/test_agent_progress.py::test_repeated_identical_evidence_stops_the_loop	找到的文档必须能整篇打开；连续无新证据必须提前终止	python scripts/diag_retrieval_miss.py	2026-09

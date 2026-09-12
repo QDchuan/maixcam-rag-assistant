@@ -27,12 +27,15 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ..evaluation.harness import check_symbols
-from ..models import ApiSymbol, Chunk
+from ..models import ApiSymbol, Chunk, RetrievalHit
 from ..retrieval import HybridRetriever
 from .registry import Context
 from .tools import Capability, Tool, ToolParam, ToolResult
 
 MAX_SNIPPET_CHARS = 1200
+# 整篇读取的上限。刻意比单片段大得多（片段 1200 字符），
+# 但仍有上限——一个 17 段的文档全塞进去会挤掉后面所有轮次的上下文。
+READ_DOC_MAX_CHARS = 6000
 
 
 def format_hits(hits, offset: int = 0, max_chars: int = MAX_SNIPPET_CHARS) -> str:
@@ -107,7 +110,8 @@ class RagTools:
                 names = [s.qualname for s in suffix[:12]]
                 return ToolResult.success(
                     f"{q!r} 有 {len(suffix)} 个同名符号，请指定完整限定名：\n"
-                    + "\n".join(f"  · {n}" for n in names)
+                    + "\n".join(f"  · {n}" for n in names),
+                    evidence=tuple(names),
                 )
 
         if not exact:
@@ -126,7 +130,7 @@ class RagTools:
         if s.params:
             parts.append(f"参数：{s.params}")
         parts.append(f"来源：{s.url}")
-        return ToolResult.success("\n".join(parts))
+        return ToolResult.success("\n".join(parts), evidence=(s.qualname,))
 
     # -- 确定性：列模块成员 -----------------------------------------------
 
@@ -136,7 +140,8 @@ class RagTools:
         if not m:
             mods = sorted({s.module for s in self.symbols})
             return ToolResult.success(
-                f"共有 {len(mods)} 个模块：\n" + "\n".join(f"  · {x}" for x in mods)
+                f"共有 {len(mods)} 个模块：\n" + "\n".join(f"  · {x}" for x in mods),
+                evidence=tuple(mods),
             )
         # 允许只给末段（camera → maix.camera）
         hits = [s for s in self.symbols
@@ -151,7 +156,10 @@ class RagTools:
         for s in hits:
             brief = (s.signature or s.kind).replace("def ", "", 1)
             lines.append(f"  · {s.name}  {brief[:90]}")
-        return ToolResult.success("\n".join(lines))
+        # evidence 用**符号限定名**而不是模块名：模型第二次列同一个模块时，
+        # 拿到的是同一批符号，那才是"没有新信息"。用模块名做指纹会漏判。
+        return ToolResult.success("\n".join(lines),
+                                  evidence=tuple(s.qualname for s in hits))
 
     # -- 确定性：校验代码里的符号 -----------------------------------------
 
@@ -208,18 +216,123 @@ class RagTools:
         n = min(n, 20)
         hits = self.retriever.retrieve(query, k=n)
         if not hits:
-            return ToolResult.success(
+            # **"没找到"必须是失败，不能是成功。**
+            #
+            # 这里原来返回 success，于是演示里会看到一个绿勾配上"没有找到相关片段"——
+            # 和 [事故 07](../../docs/postmortem/07-校验静默放行.md) 同一类：
+            # 一个"什么都没给你"的结果被标成成功。
+            # 标成失败有两个实际好处：它会进入循环的连续失败计数，
+            # 也会让模型看到 ✗ 而不是 ✓，从而更早换策略（换关键词、换工具、或承认查不到）。
+            return ToolResult.failure(
                 f"没有找到与 {query!r} 相关的片段。"
-                f"可以试试换关键词、用更具体的 API 名，或改用 lookup_api 精确查符号。"
+                f"换更具体的 API 名、缩短查询，或改用 lookup_api / list_api。",
+                kind="not_found",
             )
         # 累积 + 连续编号：让答案里的 [n] 在整个会话内无歧义
         text = format_hits(hits, offset=len(self.all_hits))
         self.all_hits.extend(hits)
-        return ToolResult.success(text)
+        return ToolResult.success(
+            text, evidence=tuple(h.chunk.chunk_id for h in hits)
+        )
 
     def reset_citations(self) -> None:
         """每次运行前清空累积的引用池——否则上一题的结果会串到下一题。"""
         self.all_hits.clear()
+
+    # -- 确定性：整篇读一个文档 -------------------------------------------
+
+    def read_doc(self, doc_id: str, section: str = "",
+                 max_chars: int = 0) -> ToolResult:
+        """把一个文档（或它的某一节）按顺序整篇读出来。
+
+        ## 为什么必须有这个工具
+
+        `search_docs` 返回的是**片段**。片段是"为了被检索而切出来的"，
+        它只保证"这一小块能和某个查询对上"，**不保证自洽、不保证含答案**。
+
+        真实发生过一次（见 [事故 08](../../docs/postmortem/08-找到了文档却读不到正文.md)）：
+        用户问"如何设计一个二维云台人脸跟踪系统"，而语料里就有
+        `projects/face_tracking.md`。检索**完全正确**——该文档在所有查询下都排第 1
+        （score 0.73）。但返回的前 5 个片段是：
+
+            [1] 简介：基于 MaixCAM 和云台的人脸追踪程序。实际效果如下图所示：
+            [2] 常见问题：人脸跟踪效果不理想，调 PID …
+            [3] 常见问题：云台抖动，调 PID 和死区 …
+            [4][5] 另外两篇不相干的文档
+
+        真正的接线、引脚、代码在文档中段，**没进前 5**。
+        agent 看到 [1] 是个只有一句话的"简介"，合理地判断"这不是我要的"，
+        于是**改写查询再搜一次**——搜了 6 次、烧光 10 轮预算，
+        而它要找的东西一直在磁盘上。
+
+        **模型的行为是对的，是工具的接口不够。** 一个只会"模糊搜索"、
+        却不会"打开我找到的那份文档"的 agent，注定要在这种题上打转。
+
+        ## 为什么它是确定性的
+
+        和 `lookup_api` 同一类：给定 doc_id 就返回确定的内容，没有相似度、没有随机性。
+        所以它便宜、可复现，而且**不需要模型把查询写得多好**——
+        这正好补上了 `search_docs` 最大的短板。
+        """
+        q = doc_id.strip().strip("`")
+        if not q:
+            return ToolResult.failure("doc_id 不能为空", kind="invalid_args")
+
+        by_doc: dict[str, list[Chunk]] = {}
+        for c in self.chunks:
+            by_doc.setdefault(c.doc_id, []).append(c)
+
+        # 先精确匹配，再后缀匹配（模型常只写文件名 face_tracking）
+        target = q if q in by_doc else ""
+        if not target:
+            suffix = [d for d in by_doc
+                      if d.endswith("/" + q) or d.split("/")[-1] == q]
+            if len(suffix) == 1:
+                target = suffix[0]
+            elif len(suffix) > 1:
+                return ToolResult.failure(
+                    f"{q!r} 匹配到 {len(suffix)} 个文档，请用完整 doc_id：\n"
+                    + "\n".join(f"  · {d}" for d in sorted(suffix)[:15]),
+                    kind="not_found",
+                )
+        if not target:
+            near = sorted(by_doc)[:20]
+            return ToolResult.failure(
+                f"没有文档 {q!r}。可用的 doc_id 形如：\n"
+                + "\n".join(f"  · {d}" for d in near)
+                + f"\n（共 {len(by_doc)} 个文档；"
+                  f"用 list_api 或 search_docs 可以先找到它们）",
+                kind="not_found",
+            )
+
+        chunks = sorted(by_doc[target], key=lambda c: c.ordinal)
+        if section.strip():
+            key = section.strip()
+            chunks = [c for c in chunks
+                      if any(key in h for h in c.heading_path)]
+            if not chunks:
+                heads = sorted({c.heading_text for c in by_doc[target]})
+                return ToolResult.failure(
+                    f"文档 {target} 里没有标题含 {key!r} 的章节。它的章节有：\n"
+                    + "\n".join(f"  · {h or '(无标题)'}" for h in heads),
+                    kind="not_found",
+                )
+
+        limit = max_chars if isinstance(max_chars, int) and max_chars > 0 \
+            else READ_DOC_MAX_CHARS
+
+        hits = [RetrievalHit(chunk=c, score=1.0, rank=i, retriever="read_doc")
+                for i, c in enumerate(chunks)]
+        # 编号与 search_docs 共用同一个累积池：**引用编号在整个会话内必须无歧义**，
+        # 否则答案里的 [3] 到底指哪一段就无法判断，引用校验也无从做起。
+        text = format_hits(hits, offset=len(self.all_hits), max_chars=limit)
+        self.all_hits.extend(hits)
+        head = (f"已打开文档 {target}（{len(chunks)} 个片段"
+                f"：{', '.join(sorted({c.kind for c in chunks}))}）")
+        return ToolResult.success(
+            head + "\n\n" + text,
+            evidence=tuple(c.chunk_id for c in chunks),
+        )
 
 
 # --------------------------------------------------------------------------
@@ -275,6 +388,29 @@ def make_rag_tools(rag: RagTools) -> list[Tool]:
             requires={Capability.PURE},
         ),
         Tool(
+            name="read_doc",
+            description=(
+                "把检索到的某个文档**整篇按顺序读出来**，或只读它的某一节。\n"
+                "什么时候用：search_docs 返回的片段里有你需要的文档（看「来源：」那一行），"
+                "**但片段本身是残缺的**——只有一句简介、或者只是 FAQ 的一条。"
+                "这时不要改写查询再搜一遍，直接用 doc_id 把那份文档打开。\n"
+                "什么时候不要用：还不知道该看哪份文档时，先用 search_docs。\n"
+                "doc_id 可以只写文件名（比如 face_tracking），有歧义时会把候选列出来。\n"
+                "**反复用不同措辞搜索同一个东西，往往说明你要的是这个工具。**"
+            ),
+            params=[
+                ToolParam("doc_id", "string",
+                          "文档 id，如 zh/projects/face_tracking 或 face_tracking"),
+                ToolParam("section", "string",
+                          "只看标题含这个关键词的章节，留空读整篇",
+                          required=False),
+                ToolParam("max_chars", "integer",
+                          "返回内容上限，默认 6000", required=False),
+            ],
+            handler=rag.read_doc,
+            requires={Capability.PURE},
+        ),
+        Tool(
             name="search_docs",
             description=(
                 "在 MaixPy 文档里检索相关片段（教程 + API 参考两层）。\n"
@@ -295,19 +431,34 @@ def make_rag_tools(rag: RagTools) -> list[Tool]:
 
 
 class RagToolsPlugin:
-    """把四个工具注册到工具服务上。
+    """把工具注册到工具服务上。
 
     卸载时工具自动消失——因为 `register` 返回的撤销函数被登记进了 `ctx.effect`。
-    **这就是"能力可插拔"落到实处的样子**：插上就有这四个工具，拔掉就一个不剩。
+    **这就是"能力可插拔"落到实处的样子**：插上就有这几个工具，拔掉就一个不剩。
+
+    `only` 来自 `cfg.agent.tools`。加这个过滤是因为那份清单曾经是**装饰性的**：
+    上面写着一个不存在的 `get_page`，而代码注册的是另外四个，
+    两者对不上却没有任何地方会报错。**配置要么管事，要么别写。**
     """
 
     name = "maixcam-rag-tools"
 
-    def __init__(self, rag: RagTools):
+    def __init__(self, rag: RagTools, only: list[str] | None = None):
         self.rag = rag
+        self.only = list(only) if only else None
 
     def apply(self, ctx: Context) -> None:
         tools = ctx.require("tools")
+        known = {t.name for t in make_rag_tools(self.rag)}
+        if self.only:
+            unknown = [n for n in self.only if n not in known]
+            if unknown:
+                raise ValueError(
+                    f"agent.tools 里写了不存在的工具 {unknown}；"
+                    f"可用的是 {sorted(known)}"
+                )
         for t in make_rag_tools(self.rag):
+            if self.only and t.name not in self.only:
+                continue
             undo = tools.register(t, owner=self.name)
             ctx.effect(undo)

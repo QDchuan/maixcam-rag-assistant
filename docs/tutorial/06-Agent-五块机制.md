@@ -184,9 +184,9 @@ python -m maixrag --config configs/l2_hybrid.yaml agent-eval --max-turns 10 --fa
 | 路径越界的两种判定 | 前缀判断：2/2 放行；规范化：2/2 拦住 | [本项目实测]（场景三；符号链接一行视本机权限） |
 | 连续同类失败的截止点 | `max_repeated_errors=3` → 第 3 轮停止，不是烧完 50 轮 | [本项目实测]（`test_repeated_same_error_stops_early`） |
 | 默认预算 | `max_turns=6` · `max_tool_calls=12` · `max_tokens=60000` | [本项目实测]（`Budget` 默认值） |
-| agent 的真实成本（18 题） | 88 次工具调用，平均 4.9 次/题：`search_docs` 31 · `lookup_api` 25 · `check_api_usage` 21 · `list_api` 11 | [本项目实测] |
+| agent 的真实成本（18 题） | 75 次工具调用，平均 4.2 次/题：`search_docs` 31 · `lookup_api` 25 · `check_api_usage` 21 · `list_api` 11 | [本项目实测] |
 | YOLO 题：4 轮失败、10 轮给出可运行代码并自检两次 | 见轨迹 | [本项目实测] |
-| 检索轴：链式 vs agent（真实模型，文档冻结时） | Recall@K 0.611 → 0.556；MRR 0.453 → 0.352 | [本项目实测]，**但见第 6 节** |
+| 检索轴：链式 vs agent（真实模型，文档冻结时） | Recall@K 0.611 → 0.667；MRR 0.453 → 0.416 | [本项目实测]，**但见第 6 节** |
 | 检索轴：链式（本次复跑，`configs/l2_hybrid.yaml`，rrf:dense+bm25） | Recall@K **0.694**（concept 0.688 / example 0.750 / signature 0.500 / troubleshoot 1.000） | [本项目实测]（本次复跑，比文档记录的 0.611 高——**数字会随语料与配置漂移**） |
 | 检索轴：agent + `--fake-chat`（同一配置） | Recall@K **0.028**（18 题里只有 q001 命中 0.50），工具调用总数 **1** | [本项目实测]——**这是一个无效测量，见 6.4** |
 

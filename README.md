@@ -1,6 +1,6 @@
 # MaixCAM 开发助手 —— RAG × Harness 教学项目
 
-> **当前状态**：主分支（教学主线）已完成并可运行；**54 篇文档 / 790 KB**；166 个测试通过。
+> **当前状态**：主分支（教学主线）已完成并可运行；**57 篇文档 / 832 KB**；224 个测试通过。
 > Harness 分支与 Skill 分支待做。
 >
 > 一份**真实可用**的 MaixPy 开发助手，同时是一份**可跟做**的 RAG 与 Agent 教学材料。
@@ -65,8 +65,8 @@
 | 评测 | 两条轴 · 18 题 / 4 类 qtype · **能程序判的一律程序判** |
 | 防幻觉校验 | 符号白名单 + 导入别名解析 + 实例类型推断，带回归测试 |
 | **主分支 agent** | **五块机制完成**：服务注册表 / 工具 / 提示词装配 / 循环与预算 / 权限沙盒 |
-| 测试 | **166 个**（165 通过 + 1 显式跳过） |
-| 文档 | **54 篇 / 790 KB**（概念 / 教程 / 习题 / 事故档案 / 设计） |
+| 测试 | **224 个**（223 通过 + 1 显式跳过） |
+| 文档 | **57 篇 / 832 KB**（概念 / 教程 / 习题 / 事故档案 / 设计 / 证据） |
 
 ---
 
@@ -116,9 +116,41 @@
 
 **差别不在模型，也不在语料，只在有没有循环。**
 
-而成本是真实的：18 题用了 **88 次工具调用**（平均 4.9 次/题），
-其中 `check_api_usage` 被调 21 次——**agent 在主动自检**，
-这是链式基线完全没有的行为。
+而成本是真实的：18 题用了 **75 次工具调用**（平均 4.2 次/题），
+其中 `check_api_usage` 被调 15 次、**`read_doc` 被调 20 次**——
+前者说明 agent 在主动自检，后者是补上"找到文档还要能打开"这个动作之后才有的
+（见 [事故 08](./docs/postmortem/08-找到了文档却读不到正文.md)）。
+两者都是链式基线完全没有的行为。
+
+**补上 `read_doc` 与"原地打转检测"之后，agent 在检索轴上的数字也一起涨了**
+（同一评测集、同一套指标，18 题）：
+
+| 指标 | 补之前 | 补之后 | 为什么 |
+| --- | --- | --- | --- |
+| Recall@K | 0.556 | **0.667** | 打开整篇文档后，答案里有依据的题变多
+| MRR | 0.352 | **0.416** | 首位命中提前
+| 引用精确率 | 0.833 | **1.000** | 编号连续，答案里的 `[n]` 全部落在真实片段上
+| 引用召回率 | 0.828 | **0.991** | 同上
+| 拒答率 | 0.500 | 0.444 | 预算耗尽时改为给部分答案
+| 触发禁止项比例 | 0.000 | **0.056** | ⚠️ **退步**：有一题引用了禁用词（见下）
+| P50 延迟 | 11 ms | 12,893 ms | ⚠️ **不是变慢**，是之前的数大部分命中了对话缓存（见下）
+
+**两个必须如实说明的地方。**
+
+**禁止项从 0 涨到 0.056（1/18 题）。** 禁用词是 `cv2.VideoCapture` / `picamera`
+这类"别的框架的 API"。最可能的原因是 `read_doc` 现在会把整篇文档交给模型，
+而文档里可能有"不要用 OpenCV 那一套"这样的对比段落被一并引用。
+**在查清之前不声称它是误报也不声称是幻觉**——现在的报告只告诉你
+"有一题踩了线"，没说哪一题、踩了哪个词，这本身就是个缺陷。
+已给逐题明细加了「禁止项」与「检查了」两列，下次跑就能直接定位
+（这正是 [事故 05](./docs/postmortem/05-伪装成好消息的0.md)
+"指标必须暴露覆盖面"的同一条原则）。
+
+**P50 延迟从 11 ms 变成 12.9 s，不是性能退化。** 11 ms 这个数只可能来自
+**对话磁盘缓存命中**（`indexes/cache/`）——一次真实的大模型调用不可能 11 毫秒。
+这一轮因为工具表变了，提示词变了，缓存全部失效，于是量到的是真实延迟。
+**一个会命中缓存的延迟指标，量的是缓存，不是模型**——这又是一个"指标在说假话"的例子，
+只不过这次它说的是"我很快"。
 
 ### 三、一个诚实的负面结果
 
@@ -143,28 +175,31 @@ python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt        # Windows
 # source .venv/bin/activate && pip install -r requirements.txt   # Linux/macOS
 
-# 2. 密钥与端点（复制后填写；.env 已被 gitignore 保护）
-copy .env.example .env
+# 2. 配置模型端点 —— 对话式向导：问你几个问题，当场验证连通，再写盘
+python -m maixrag setup
+#    不想走向导也可以直接编辑 .env（字段含义见 docs/tutorial/09-配置与密钥.md）
+#    只看当前配置：python -m maixrag setup --check --probe
 
 # 3. 嵌入模型：本地 Ollama，零成本可离线
 ollama pull bge-m3
 
 # 4. 语料 → 索引
-python -m maixrag --config configs/l2_hybrid.yaml corpus adopt   # 或 corpus fetch（需网络）
-python -m maixrag --config configs/l2_hybrid.yaml corpus build
-python -m maixrag --config configs/l2_hybrid.yaml index build
+python -m maixrag corpus adopt --config configs/l2_hybrid.yaml   # 或 corpus fetch（需网络）
+python -m maixrag corpus build --config configs/l2_hybrid.yaml
+python -m maixrag index build --config configs/l2_hybrid.yaml
 
 # 5. 终端演示 —— 看 agent 一轮一轮做决策（呈现层是个可拔的插件）
 python -m maixrag demo --list                      # 看能问什么，不需要密钥
 python -m maixrag demo --fake-chat "MaixCAM 的 GPIO 怎么用？"   # 完全离线
-python -m maixrag demo --max-turns 10 "MaixCAM 的 GPIO 怎么用？怎么点灯？"   # 真实模型
+python -m maixrag demo "如何设计一个二维云台人脸跟踪系统"        # 真实模型，多跳
+#    Windows 上也可以直接双击 demo.cmd
 
 # 6. 跑主分支的 agent（不配密钥也能跑通全流程）
-python -m maixrag --config configs/l2_hybrid.yaml agent "MaixPy 里怎么做 YOLO 物体检测？" --fake-chat
-python -m maixrag --config configs/l2_hybrid.yaml agent "MaixPy 里怎么做 YOLO 物体检测？" --max-turns 10
+python -m maixrag agent "MaixPy 里怎么做 YOLO 物体检测？" --config configs/l2_hybrid.yaml --fake-chat
+python -m maixrag agent "MaixPy 里怎么做 YOLO 物体检测？" --config configs/l2_hybrid.yaml --max-turns 10
 
 # 7. 只测检索轴（不花钱、不联网、不需要模型 key）
-python -m maixrag --config configs/l2_hybrid.yaml eval --level rag --fake-chat
+python -m maixrag eval --level rag --config configs/l2_hybrid.yaml --fake-chat
 python scripts/inspect_eval.py          # 看每条指标覆盖了多少题
 
 # 8. 防幻觉校验器
@@ -175,6 +210,11 @@ python scripts/regress_check_api_usage.py    # 校验器真的在检查，而不
 > **`demo` 和 `agent` 的区别**：`agent` 是给评测与调试用的（跑完一次性打印轨迹），
 > `demo` 是给人看的（实时画过程 + 启动画面）。
 > 两者跑的是**同一个 agent**——`demo` 只是多挂了一个呈现插件。
+
+> **`--config` 放在子命令前后都行**（`maixrag --config x.yaml eval` 与
+> `maixrag eval --config x.yaml` 等价）。这条专门修过：
+> 原来只支持前置，而"选项跟在动词后面"是最自然的写法——
+> 跑评测的人第一次就会撞上 `unrecognized arguments`。
 
 **为什么嵌入用本地 Ollama**：DeepSeek 不提供 embeddings 接口（实测 404）。
 本地 `bge-m3` 多语言、中文强、零成本、可离线——对教学项目最合适。
@@ -205,7 +245,7 @@ python scripts/regress_check_api_usage.py    # 校验器真的在检查，而不
 大多数教学项目展示的是打磨过的正确路径。但 RAG 与 agent 工程里最难的部分，
 恰恰是**东西安静地坏掉**的时候——没有报错、没有异常、指标看起来还行。
 
-七次真实事故，每一次都有完整的症状 → 根因 → 修复 → 回归测试：
+八次真实事故，每一次都有完整的症状 → 根因 → 修复 → 回归测试：
 
 | 事故 | 教的是哪一类判断 |
 | --- | --- |
@@ -216,8 +256,9 @@ python scripts/regress_check_api_usage.py    # 校验器真的在检查，而不
 | [伪装成好消息的 0](./docs/postmortem/05-伪装成好消息的0.md) | 指标会伪装成好消息 |
 | [预算与任务不匹配](./docs/postmortem/06-预算与任务不匹配.md) | 参数要匹配任务 |
 | [校验静默放行](./docs/postmortem/07-校验静默放行.md) | **"没查出错" ≠ "没查"** |
+| [找到了文档却读不到正文](./docs/postmortem/08-找到了文档却读不到正文.md) | **"成功了" ≠ "有收获"** |
 
-**七条覆盖七种不同类别的判断力**，而每一条都能被复现。
+**八条覆盖八种不同类别的判断力**，而每一条都能被复现。
 
 > 第七条是**跑终端演示时发现的**：agent 在答案最后自己写道
 > 「这次自检实际没有起到校验作用」。顺这句话查下去，发现第一级防幻觉校验

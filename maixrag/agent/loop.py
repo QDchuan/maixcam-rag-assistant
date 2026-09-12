@@ -177,6 +177,17 @@ class AgentLoop:
 
     `max_repeated_errors` 这条参数值得单独说：它防的是
     "模型在一个它修不好的错上把预算烧光"——这是真实运行里最常见的一种浪费。
+
+    `max_no_progress` 防的是**另一种更隐蔽的浪费**：模型每一步都成功，
+    但**没有带回任何新东西**。它表现为不停改写措辞重复同一个动作：
+
+        search_docs("人脸检测 云台 舵机 跟踪")        ✓ 5 个片段
+        search_docs("人脸追踪2轴云台 例程 代码 舵机 PWM")  ✓ 又是那 5 个片段
+        search_docs("face_tracking 云台 PID 死区")     ✓ 还是那 5 个片段
+        …直到预算烧光
+
+    每一条都是 `ok=True`，所以 `max_repeated_errors` 完全看不见它。
+    **"成功但没有新信息"是 agent 最常见的烧钱方式**，比报错常见得多。
     """
 
     def __init__(
@@ -186,6 +197,7 @@ class AgentLoop:
         prompt: PromptAssembler,
         budget: Budget | None = None,
         max_repeated_errors: int = 3,
+        max_no_progress: int = 3,
     ):
         self.model = model
         self.tools = tools
@@ -195,6 +207,7 @@ class AgentLoop:
         # 表现为"同一个循环，第二次问同样的问题直接就预算耗尽了"。
         self._budget_limits = budget or Budget()
         self.max_repeated_errors = max_repeated_errors
+        self.max_no_progress = max_no_progress
         self.budget = self._new_budget()
         # 实时事件的订阅者。这是**呈现层与逻辑层的解耦点**：
         # 终端演示、日志、遥测都只是订阅者，循环本身不知道它们存在。
@@ -252,6 +265,8 @@ class AgentLoop:
                            messages=messages, budget=self.budget.snapshot())
         last_error: str | None = None
         repeated = 0
+        seen_evidence: set[str] = set()
+        no_progress = 0
 
         while True:
             reason = self.budget.exhausted()
@@ -259,7 +274,7 @@ class AgentLoop:
                 # **优雅降级，不是静默失败。**
                 result.stopped_reason = "budget"
                 result.incomplete = reason
-                result.answer = self._degrade(result, reason)
+                result.answer = self._degrade(result, reason, messages)
                 self._record(result, Event(self.budget.turns, "budget", reason))
                 break
 
@@ -285,7 +300,7 @@ class AgentLoop:
                     Event(self.budget.turns, "decision", "模型既没调工具也没给答案")
                 )
                 result.stopped_reason = "error"
-                result.answer = self._degrade(result, "模型返回了无法识别的决策")
+                result.answer = self._degrade(result, "模型返回了无法识别的决策", messages)
                 break
 
             self.budget.consume_tool_call()
@@ -322,25 +337,127 @@ class AgentLoop:
                             f"判断为卡住，提前终止")
                     result.stopped_reason = "stuck"
                     result.incomplete = gate
-                    result.answer = self._degrade(result, gate)
+                    result.answer = self._degrade(result, gate, messages)
                     self._record(result, 
                         Event(self.budget.turns, "budget", gate)
                     )
                     break
             else:
                 last_error, repeated = None, 0
+                no_progress = self._track_progress(
+                    ex.result.evidence, seen_evidence, no_progress)
+                if no_progress >= self.max_no_progress:
+                    gate = self._stuck_on_progress(call.name, no_progress)
+                    result.stopped_reason = "stuck"
+                    result.incomplete = gate
+                    result.answer = self._degrade(result, gate, messages)
+                    self._record(result,
+                                 Event(self.budget.turns, "no_progress", gate))
+                    break
 
         # 降级答案里也要带上 token 记账，便于观察成本
         result.budget = self.budget.snapshot()
         return result
 
     @staticmethod
-    def _degrade(result: RunResult, reason: str) -> str:
-        """预算耗尽或卡住时的降级答案。
+    def _track_progress(evidence: tuple[str, ...], seen: set[str],
+                        current: int) -> int:
+        """这次调用的证据里有没有新东西？返回**连续无新证据的次数**。
+
+        只认 `evidence` 里已经见过的那些：一次调用带回 5 个片段、
+        其中 1 个是新的，就算有进展，计数归零。
+
+        `evidence` 为空表示这个工具"不产出证据"（比如校验代码是否合法，
+        它给的是判断而不是材料），**这种调用既不算进展也不算原地打转**，
+        计数保持不变——否则两次 check_api_usage 就会被误判成卡住。
+        """
+        if not evidence:
+            return current
+        fresh = [e for e in evidence if e not in seen]
+        if fresh:
+            seen.update(fresh)
+            return 0
+        return current + 1
+
+    @staticmethod
+    def _stuck_on_progress(tool_name: str, n: int) -> str:
+        """原地打转时给出的说明。
+
+        **必须点名"你手上的材料没变"，而不是只说"超预算了"。**
+        因为这两件事的修法完全相反：
+          · 超预算 → 加大预算；
+          · 没有新证据 → 加大预算只会烧更多钱，要做的是换工具
+            （比如从"反复搜索"改成"把找到的那份文档打开"）或承认查不到。
+        """
+        return (f"连续 {n} 次调用（最近一次是 {tool_name}）都没有带回任何新片段，"
+                f"判断为原地打转，提前终止——**继续加大预算不会有用**。\n"
+                f"换措辞重复搜索通常说明：需要的材料已经在手上了，"
+                f"应该换成 read_doc 打开已找到的文档，或者承认资料确实没覆盖。")
+
+    def _degrade(self, result: RunResult, reason: str,
+                 messages: list[Message]) -> str:
+        """预算耗尽或卡住时的收尾。
+
+        ## 为什么不能只打印一份"状态报告"
+
+        这里原来输出的是一份**关于过程**的报告：
+
+            未能完成回答，原因是：轮次达到上限（4）
+            已完成的部分：· search_docs 成功 · search_docs 成功 …
+            建议缩小问题范围，或提高预算后重试。
+
+        而本项目的设计文档自己写的是"**用已有证据给一个部分答案**"。
+        打印工具名单不是部分答案，它是关于 agent 自己的报告，不是关于问题的回答。
+
+        真实后果（见 docs/postmortem/08）：用户问"如何设计一个二维云台人脸跟踪系统"，
+        agent 已经读到了官方教程、PWM 文档与人脸检测文档，
+        却只回一句"轮次达到上限（8）"。**材料全在手边，一个字没用上。**
+
+        ## 所以补一次"最后一次发言"
+
+        把工具表清空（传 `[]`，让它**无法**再调工具），要求它用手上的材料作答。
+        这一次调用失败、或者它仍然想调工具时，才退回状态报告。
+
+        代价是一次额外调用；换来的是"预算不够时仍然拿到能用的东西"。
+        这笔交换在**任何**给人用的 agent 上都划算——因为用户要的是答案，
+        不是运行日志。注意这不改变 `stopped_reason`：过程仍然如实记录为 budget。
+        """
+        synthesized = self._final_word(result, reason, messages)
+        if synthesized:
+            return (f"【预算已用尽，以下是基于已获取材料的回答】\n"
+                    f"（未完成的原因：{reason}）\n\n{synthesized}")
+        return self._status_report(result, reason)
+
+    def _final_word(self, result: RunResult, reason: str,
+                    messages: list[Message]) -> str:
+        """用已有材料做最后一次作答。失败返回空串，由调用方退回状态报告。"""
+        if not any(e.result.ok for e in result.executions):
+            return ""   # 一个成功的调用都没有，没什么可组织的
+        ask = (
+            f"[系统] 预算已用尽（{reason}）。\n"
+            f"请**立刻**根据上面已经拿到的工具结果给出你能给出的最完整的回答。\n"
+            f"要求：\n"
+            f"  1. 不要再调用任何工具（调用也不会被执行）；\n"
+            f"  2. 明确区分「资料里查到的」和「你没有查到的」；\n"
+            f"  3. 引用时沿用工具结果里的 [编号]；\n"
+            f"  4. 不要因为没查全就整篇拒答——把手上的东西讲清楚，比什么都不说有用。"
+        )
+        try:
+            # 传空工具表：**从接口上**让它无法再调工具，
+            # 而不是靠提示词请求它别调。能靠结构约束的就别靠礼貌。
+            decision = self.model.decide(list(messages) + [Message("user", ask)], [])
+        except Exception:  # noqa: BLE001 —— 收尾失败不该再炸一次
+            return ""
+        if decision.kind == "final" and decision.text.strip():
+            return decision.text.strip()
+        return ""
+
+    @staticmethod
+    def _status_report(result: RunResult, reason: str) -> str:
+        """退路：连一次收尾调用都做不成时，如实报告。"
 
         **绝不静默失败。** 静默失败会伪装成成功：
         用户拿到一个简短回答，不知道其实什么都没查到。
-        所以这里明确写出"用了多少、还差什么"。
         """
         done = [e for e in result.executions if e.result.ok]
         if done:
