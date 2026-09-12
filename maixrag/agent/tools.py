@@ -110,6 +110,10 @@ class Tool:
     params: list[ToolParam]
     handler: ToolHandler
     requires: set[str] = field(default_factory=lambda: {Capability.PURE})
+    # 哪些参数是**路径**。必须显式声明，不能让权限系统去猜参数名——
+    # 猜错的后果是"某个工具的路径参数不经过范围检查"，
+    # 而这类漏洞不会有任何报错，只会安静地放行。
+    path_params: list[str] = field(default_factory=list)
 
     def to_schema(self) -> dict[str, Any]:
         """模型看到的形态。
