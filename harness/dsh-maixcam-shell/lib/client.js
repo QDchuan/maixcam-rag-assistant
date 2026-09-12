@@ -117,6 +117,10 @@ window.__ModuleLoader__.load({
 			'.dsh-mx-hit-text{white-space:pre-wrap;word-break:break-word;max-height:96px;overflow:hidden;',
 			'font-size:12px;line-height:18px;opacity:.82}',
 			'.dsh-mx-note{opacity:.6;font-size:12px}',
+			'.dsh-mx-facets{display:flex;flex-direction:column;gap:10px;padding:12px 14px;border-radius:12px;',
+			'border:1px solid rgba(0,229,255,.22);background:rgba(0,229,255,.05)}',
+			'.dsh-mx-facet{display:flex;flex-direction:column;gap:6px}',
+			'.dsh-mx-facet-head{display:flex;align-items:baseline;gap:8px;min-width:0}',
 			'.dsh-mx-warn{padding:10px 13px;border-radius:9px;font-size:12px;line-height:18px;',
 			'border:1px solid var(--dsw-alias-state-error-primary,#e5534b);',
 			'color:var(--dsw-alias-state-error-primary,#e5534b)}',
@@ -440,8 +444,50 @@ window.__ModuleLoader__.load({
 					? h(
 							'div',
 							{ className: 'dsh-mx-note' },
-							`命中 ${result.hits.length} 条 · 稠密检索 · 嵌入 ${result.embedMs} ms · `,
-							`共 ${result.totalMs} ms`,
+							`基准命中 ${result.hits.length} 条 · ${result.strategy}`,
+							result.expandedBy
+								? ` · 已由 ${result.expandedBy} 自动扩展为 ${result.facets.length} 个面向`
+								: '',
+							` · 共 ${result.totalMs} ms`,
+						)
+					: null,
+
+				// ── 自动扩展出来的关联面向 ────────────────────────────────────────
+				//
+				// 这一段是这块面板的关键。向量匹配只会返回「最像整题的那一页」——
+				// 问「设计一个二维云台人脸跟随系统」，它就把「人脸追踪2轴云台」端上来，
+				// 不会想到还要看舵机、PWM、引脚、供电。
+				//
+				// 所以先让 LLM 把问题拆成若干面向，再逐面检索；这里把每个面向的
+				// 命中摊开给人看。**后端一直在返回 facets，是这块面板从前没渲染它。**
+				result && Array.isArray(result.facets) && result.facets.length > 0
+					? h(
+							'div',
+							{ className: 'dsh-mx-facets' },
+							h(
+								'div',
+								{ className: 'dsh-mx-note' },
+								`模型自动扩展出的 ${result.facets.length} 个面向（单查询覆盖不到这些）：`,
+							),
+							result.facets.map((facet) =>
+								h(
+									'div',
+									{ key: facet.aspect, className: 'dsh-mx-facet' },
+									h(
+										'div',
+										{ className: 'dsh-mx-facet-head' },
+										h('span', { className: 'dsh-mx-badge' }, facet.aspect),
+										h(
+											'span',
+											{ className: 'dsh-mx-hit-path' },
+											[...new Set(facet.hits.map((x) => x.doc_title))].join(' · '),
+										),
+									),
+									facet.hits
+										.slice(0, 2)
+										.map((hit, i) => h(EvidenceCard, { key: hit.chunk_id, hit, index: i })),
+								),
+							),
 						)
 					: null,
 
